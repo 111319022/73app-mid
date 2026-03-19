@@ -195,11 +195,7 @@ struct SettingsView: View {
             }
             .navigationTitle("設定")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(
-                AviationTheme.Colors.background(colorScheme),
-                for: .navigationBar
-            )
-            .toolbarColorScheme(colorScheme == .dark ? .dark : .light, for: .navigationBar)
+            .toolbarBackgroundVisibility(.automatic, for: .navigationBar)
             .sheet(isPresented: $showingAirportPicker) {
                 SettingsAirportPickerWrapper(selectedCode: $preferredOrigin)
             }
@@ -307,10 +303,7 @@ struct CardManagementView: View {
         }
         .navigationTitle("我的信用卡")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(
-            AviationTheme.Colors.background(colorScheme),
-            for: .navigationBar
-        )
+        .toolbarBackgroundVisibility(.automatic, for: .navigationBar)
     }
 }
 

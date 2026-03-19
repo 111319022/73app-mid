@@ -204,8 +204,7 @@ struct LedgerView: View {
             }
             .navigationTitle("哩程記帳本")
             .navigationBarTitleDisplayMode(.large) // 使用 large 模式，滾動時會自動縮小
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbarColorScheme(colorScheme == .dark ? .dark : .light, for: .navigationBar)
+            .toolbarBackgroundVisibility(.automatic, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

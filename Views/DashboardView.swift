@@ -36,11 +36,7 @@ struct DashboardView: View {
             }
             .navigationTitle("儀表板")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(
-                AviationTheme.Colors.background(colorScheme).opacity(0.95),
-                for: .navigationBar
-            )
-            .toolbarColorScheme(colorScheme == .dark ? .dark : .light, for: .navigationBar)
+            .toolbarBackgroundVisibility(.automatic, for: .navigationBar)
         }
     }
 }

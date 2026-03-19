@@ -71,11 +71,7 @@ struct CalculatorLedgerView: View {
             contentView
                 .navigationTitle("新增記帳")
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackground(
-                    AviationTheme.Colors.background(colorScheme),
-                    for: .navigationBar
-                )
-                .toolbarColorScheme(colorScheme == .dark ? .dark : .light, for: .navigationBar)
+                .toolbarBackgroundVisibility(.automatic, for: .navigationBar)
                 .toolbar {
                     toolbarContent
                 }
