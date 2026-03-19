@@ -64,11 +64,7 @@ struct ProgressView: View {
             }
             .navigationTitle("進度")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(
-                AviationTheme.Colors.background(colorScheme).opacity(0.95),
-                for: .navigationBar
-            )
-            .toolbarColorScheme(colorScheme == .dark ? .dark : .light, for: .navigationBar)
+            .toolbarBackgroundVisibility(.automatic, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -111,14 +107,14 @@ struct ProgressView: View {
         VStack(spacing: 0) {
             if heroGoals.isEmpty {
                 emptyProgressView
-                    .frame(height: 250) // ✈️ 加大高度，讓點點可以往下放
+                    .frame(height: 250)
             } else if heroGoals.count == 1 {
                 HalfCircleProgressView(
                     goal: heroGoals[0],
                     currentMiles: currentMiles,
                     colorScheme: colorScheme
                 )
-                .frame(height: 250) // ✈️ 加大高度
+                .frame(height: 250)
             } else {
                 TabView(selection: $selectedGoalIndex) {
                     ForEach(Array(heroGoals.enumerated()), id: \.element.id) { index, goal in
@@ -131,7 +127,7 @@ struct ProgressView: View {
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .automatic))
-                .frame(height: 250) // ✈️ 加大高度，確保點點有足夠的下方空間
+                .frame(height: 250)
             }
             
             // 飛機圖片佈局（固定不動）
@@ -139,7 +135,6 @@ struct ProgressView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 350)
-                // ✈️ 修改重點：加上負 padding 把飛機往上拉，縮小與半圓之間的間隔
                 .padding(.top, -25)
                 .padding(.bottom, 10)
         }
@@ -169,7 +164,7 @@ struct ProgressView: View {
             }
             .padding(.bottom, 30) // 讓文字貼齊圓心底部上方
         }
-        .padding(.bottom, 35) // ✈️ 加大底部保留空間，把點點往下推
+        .padding(.bottom, 35)
     }
     
     // MARK: - 所有目標列表
@@ -333,11 +328,11 @@ struct HalfCircleProgressView: View {
             }
             .offset(y: 12)
         }
-        .padding(.bottom, 35) // ✈️ 加大底部保留空間，把 TabView 點點往下推
+        .padding(.bottom, 35)
     }
 }
 
-// ✈️ 自訂繪製的半圓形 Path
+// 自訂繪製的半圓形 Path
 struct HalfCirclePath: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -397,7 +392,9 @@ struct GoalReorderSheet: View {
                     }
                 }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
+            .listRowSpacing(6)
+            .contentMargins(.horizontal, 16)
             .environment(\.editMode, .constant(.active))
             .navigationTitle("排列順序")
             .navigationBarTitleDisplayMode(.inline)
@@ -448,7 +445,15 @@ struct GoalReorderRow: View {
                     .foregroundColor(AviationTheme.Colors.cathayJade)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+        .listRowSeparator(.hidden)
+        .listRowBackground(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(.secondarySystemGroupedBackground))
+                .padding(.vertical, 2)
+        )
     }
 }
 
