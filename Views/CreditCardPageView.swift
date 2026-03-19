@@ -46,6 +46,7 @@ struct CreditCardCell: View {
     let card: CreditCardRule
     @Bindable var viewModel: MileageViewModel
     let colorScheme: ColorScheme
+    @State private var showingAcceleratorInfo = false
     
     var cardGradient: LinearGradient {
         switch card.cardBrand {
@@ -71,34 +72,46 @@ struct CreditCardCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // MARK: 卡面視覺
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
-                    .fill(cardGradient)
-                    .frame(height: 180)
-                    .shadow(color: .black.opacity(0.25), radius: 6, x: 0, y: 3)
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Image(systemName: "creditcard.fill")
-                            .font(.title2)
-                        Spacer()
-                        Image(systemName: "airplane.circle.fill")
-                            .font(.title2)
+            Group {
+                if card.cardBrand == .cathayUnitedBank, let tier = card.cathayTier {
+                    // 國泰卡：使用實際卡片圖片
+                    Image(tier.cardImageName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md))
+                        .shadow(color: .black.opacity(0.25), radius: 6, x: 0, y: 3)
+                } else {
+                    // 台新卡或其他：使用漸層卡面
+                    ZStack(alignment: .topLeading) {
+                        RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
+                            .fill(cardGradient)
+                            .frame(height: 180)
+                            .shadow(color: .black.opacity(0.25), radius: 6, x: 0, y: 3)
+                        
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "creditcard.fill")
+                                    .font(.title2)
+                                Spacer()
+                                Image(systemName: "airplane.circle.fill")
+                                    .font(.title2)
+                            }
+                            
+                            Spacer()
+                            
+                            Text(card.bankName)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .opacity(0.8)
+                            
+                            Text(card.cardName)
+                                .font(.title3)
+                                .fontWeight(.bold)
+                        }
+                        .foregroundStyle(.white)
+                        .padding(AviationTheme.Spacing.lg)
                     }
-                    
-                    Spacer()
-                    
-                    Text(card.bankName)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .opacity(0.8)
-                    
-                    Text(card.cardName)
-                        .font(.title3)
-                        .fontWeight(.bold)
                 }
-                .foregroundStyle(.white)
-                .padding(AviationTheme.Spacing.lg)
             }
             .padding(.horizontal, AviationTheme.Spacing.md)
             .padding(.top, AviationTheme.Spacing.md)
@@ -150,10 +163,25 @@ struct CreditCardCell: View {
             // MARK: 啟用開關
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(card.isActive ? "已啟用" : "已停用")
-                        .font(AviationTheme.Typography.body)
-                        .fontWeight(.medium)
-                        .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                    if card.isActive {
+                        HStack(spacing: 4) {
+                            Text("已啟用")
+                                .font(AviationTheme.Typography.body)
+                                .fontWeight(.medium)
+                                .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                            if let tier = card.cathayTier {
+                                Text("：\(tier.rawValue)")
+                                    .font(AviationTheme.Typography.body)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(AviationTheme.Colors.cathayJade)
+                            }
+                        }
+                    } else {
+                        Text("已停用")
+                            .font(AviationTheme.Typography.body)
+                            .fontWeight(.medium)
+                            .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    }
                     Text("啟用後可在計算機中選擇此卡")
                         .font(AviationTheme.Typography.caption)
                         .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
@@ -190,7 +218,31 @@ struct CreditCardCell: View {
                     .background(AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.3))
                     .frame(height: 40)
                 
-                rateColumn(title: "加速消費", value: "\(card.acceleratorRate.formatted()) 元/哩", highlight: true)
+                // 加速消費 + info icon
+                VStack(spacing: 4) {
+                    HStack(spacing: 4) {
+                        Text("加速消費")
+                            .font(AviationTheme.Typography.caption)
+                            .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                        
+                        Button {
+                            showingAcceleratorInfo = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .font(.caption2)
+                                .foregroundColor(AviationTheme.Colors.cathayJade)
+                        }
+                        .popover(isPresented: $showingAcceleratorInfo) {
+                            AcceleratorInfoPopover(colorScheme: colorScheme)
+                                .presentationCompactAdaptation(.popover)
+                        }
+                    }
+                    Text("\(card.acceleratorRate.formatted()) 元/哩")
+                        .font(AviationTheme.Typography.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(AviationTheme.Colors.warning)
+                }
+                .frame(maxWidth: .infinity)
                 
                 Divider()
                     .background(AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.3))
@@ -226,6 +278,44 @@ struct CreditCardCell: View {
                 .foregroundColor(highlight ? AviationTheme.Colors.warning : AviationTheme.Colors.primaryText(colorScheme))
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - 加速器特店說明 Popover
+struct AcceleratorInfoPopover: View {
+    let colorScheme: ColorScheme
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("四大哩程加速器")
+                .font(AviationTheme.Typography.headline)
+                .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+            
+            Text("以下類別消費可享加速哩程回饋")
+                .font(AviationTheme.Typography.caption)
+                .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+            
+            ForEach(AcceleratorCategory.allCases, id: \.self) { category in
+                HStack(spacing: 10) {
+                    Image(systemName: category.icon)
+                        .font(.subheadline)
+                        .foregroundColor(AviationTheme.Colors.warning)
+                        .frame(width: 24)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(category.rawValue)
+                            .font(AviationTheme.Typography.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                        Text(category.acceleratorDescription)
+                            .font(AviationTheme.Typography.caption)
+                            .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    }
+                }
+            }
+        }
+        .padding(AviationTheme.Spacing.lg)
+        .frame(width: 280)
     }
 }
 

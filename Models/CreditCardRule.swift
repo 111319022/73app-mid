@@ -214,6 +214,15 @@ enum CathayCardTier: String, Codable, CaseIterable {
         }
     }
     
+    var cardImageName: String {
+        switch self {
+        case .world: return "AM_World_360x277"
+        case .titanium: return "AM_TitaniumBusinessV2_360x277"
+        case .platinum: return "AM_Platinum_360x277"
+        case .miles: return "AM_Miles_360x277"
+        }
+    }
+    
     var benefits: [String] {
         switch self {
         case .world:

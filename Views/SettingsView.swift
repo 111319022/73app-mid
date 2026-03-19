@@ -109,22 +109,6 @@ struct SettingsView: View {
                                         .tint(AviationTheme.Colors.cathayJade)
                                 }
                                 
-                                CustomDivider(colorScheme: colorScheme)
-                                
-                                // 3. 信用卡權益介紹
-                                NavigationLink(destination: CardIntroView()) {
-                                    SettingRow(
-                                        icon: "info.square.fill",
-                                        title: "聯名卡權益介紹",
-                                        subtitle: "各聯名卡回饋規則"
-                                    ) {
-                                        Image(systemName: "chevron.right")
-                                            .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
-                                            .font(.subheadline)
-                                            .fontWeight(.semibold)
-                                    }
-                                }
-                                .buttonStyle(.plain)
                             }
                             .background(AviationTheme.Colors.cardBackground(colorScheme))
                             .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))

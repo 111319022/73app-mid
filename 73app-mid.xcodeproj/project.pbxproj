@@ -18,7 +18,6 @@
 		FBF89DB42F6AC2EE003DB1EB /* MileageAccount.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89D9E2F6AC2EE003DB1EB /* MileageAccount.swift */; };
 		FBF89DB52F6AC2EE003DB1EB /* Transaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89D9F2F6AC2EE003DB1EB /* Transaction.swift */; };
 		FBF89DB62F6AC2EE003DB1EB /* CreditCardRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89D9C2F6AC2EE003DB1EB /* CreditCardRule.swift */; };
-		FBF89DB72F6AC2EE003DB1EB /* CardIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89DA52F6AC2EE003DB1EB /* CardIntroView.swift */; };
 		FBF89DB82F6AC2EE003DB1EB /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89DA62F6AC2EE003DB1EB /* DashboardView.swift */; };
 		FBF89DB92F6AC2EE003DB1EB /* AirportDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89D982F6AC2EE003DB1EB /* AirportDatabase.swift */; };
 		FBF89DBA2F6AC2EE003DB1EB /* CathayAwardChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89D9A2F6AC2EE003DB1EB /* CathayAwardChart.swift */; };
@@ -48,7 +47,6 @@
 		FBF89DA12F6AC2EE003DB1EB /* MileageViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MileageViewModel.swift; sourceTree = "<group>"; };
 		FBF89DA32F6AC2EE003DB1EB /* AllGoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllGoalsView.swift; sourceTree = "<group>"; };
 		FBF89DA42F6AC2EE003DB1EB /* CalculatorLedgerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalculatorLedgerView.swift; sourceTree = "<group>"; };
-		FBF89DA52F6AC2EE003DB1EB /* CardIntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardIntroView.swift; sourceTree = "<group>"; };
 		FBF89DA62F6AC2EE003DB1EB /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		FBF89DA72F6AC2EE003DB1EB /* LedgerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerView.swift; sourceTree = "<group>"; };
 		FBF89DA82F6AC2EE003DB1EB /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
@@ -124,7 +122,6 @@
 			children = (
 				FBF89DA32F6AC2EE003DB1EB /* AllGoalsView.swift */,
 				FBF89DA42F6AC2EE003DB1EB /* CalculatorLedgerView.swift */,
-				FBF89DA52F6AC2EE003DB1EB /* CardIntroView.swift */,
 				FBF89DA62F6AC2EE003DB1EB /* DashboardView.swift */,
 				FBF89DA72F6AC2EE003DB1EB /* LedgerView.swift */,
 				FBF89DA82F6AC2EE003DB1EB /* MainTabView.swift */,
@@ -228,7 +225,6 @@
 				FBF89DB42F6AC2EE003DB1EB /* MileageAccount.swift in Sources */,
 				FBF89DB52F6AC2EE003DB1EB /* Transaction.swift in Sources */,
 				FBF89DB62F6AC2EE003DB1EB /* CreditCardRule.swift in Sources */,
-				FBF89DB72F6AC2EE003DB1EB /* CardIntroView.swift in Sources */,
 				FB419C242F6C1BA700A30AF9 /* CreditCardPageView.swift in Sources */,
 				FBF89DB82F6AC2EE003DB1EB /* DashboardView.swift in Sources */,
 				FBF89DB92F6AC2EE003DB1EB /* AirportDatabase.swift in Sources */,

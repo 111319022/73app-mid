@@ -106,4 +106,13 @@ enum AcceleratorCategory: String, Codable, CaseIterable {
         case .leisure: return "theatermasks.fill"
         }
     }
+    
+    var acceleratorDescription: String {
+        switch self {
+        case .overseas: return "海外消費（含線上外幣交易）"
+        case .travel: return "國內外航空、飯店、旅行社、租車"
+        case .daily: return "超市、量販、加油、電信費"
+        case .leisure: return "電影院、KTV、健身房、遊樂園"
+        }
+    }
 }
