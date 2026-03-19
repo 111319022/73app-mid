@@ -19,19 +19,45 @@ struct DashboardView: View {
                 AviationTheme.Gradients.dashboardBackground(colorScheme)
                     .ignoresSafeArea()
                 
-                VStack(spacing: AviationTheme.Spacing.lg) {
-                    // 英雄卡片 - 總哩程與到期資訊
-                    if let account = viewModel.mileageAccount {
-                        HeroMilesCard(
-                            totalMiles: account.totalMiles,
-                            latestActivityMonth: account.latestActivityMonthText(),
-                            expiryDate: account.expiryDate(),
-                            daysUntilExpiry: account.daysUntilExpiry()
-                        )
-                        .padding(AviationTheme.Spacing.md)
+                ScrollView {
+                    VStack(spacing: AviationTheme.Spacing.lg) {
+                        // 英雄卡片 - 總哩程與到期資訊
+                        if let account = viewModel.mileageAccount {
+                            HeroMilesCard(
+                                totalMiles: account.totalMiles,
+                                latestActivityMonth: account.latestActivityMonthText(),
+                                expiryDate: account.expiryDate(),
+                                daysUntilExpiry: account.daysUntilExpiry()
+                            )
+                        }
+                        
+                        // 到期警示（< 90 天時顯示）
+                        if let account = viewModel.mileageAccount,
+                           account.daysUntilExpiry() < 90 {
+                            ExpiryAlertCard(
+                                daysUntilExpiry: account.daysUntilExpiry(),
+                                expiryDate: account.expiryDate()
+                            )
+                        }
+                        
+                        // 夢想雷達 - 最接近達成的目標
+                        if let goal = viewModel.closestGoal(),
+                           let currentMiles = viewModel.mileageAccount?.totalMiles {
+                            DreamRadarCard(
+                                goal: goal,
+                                currentMiles: currentMiles
+                            )
+                        }
+                        
+                        // 本月累積
+                        MonthlyCockpitCard(viewModel: viewModel)
+                        
+                        // 最新動態
+                        RecentActivityCard(transactions: viewModel.transactions)
                     }
-                    
-                    Spacer()
+                    .padding(.horizontal, AviationTheme.Spacing.md)
+                    .padding(.top, AviationTheme.Spacing.sm)
+                    .padding(.bottom, AviationTheme.Spacing.xxl)
                 }
             }
             .navigationTitle("儀表板")
@@ -41,7 +67,7 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - 卡片
+// MARK: - 英雄卡片
 struct HeroMilesCard: View {
     @Environment(\.colorScheme) var colorScheme
     let totalMiles: Int
@@ -196,23 +222,362 @@ struct HeroMilesCard: View {
         .cornerRadius(AviationTheme.CornerRadius.xl)
         .shadow(
             color: AviationTheme.Shadows.cardShadow(colorScheme),
-            radius: 12,
+            radius: 8,
             x: 0,
-            y: 4
+            y: 3
+        )
+    }
+}
+
+// MARK: - 夢想雷達卡片
+struct DreamRadarCard: View {
+    @Environment(\.colorScheme) var colorScheme
+    let goal: FlightGoal
+    let currentMiles: Int
+    
+    private var progress: Double {
+        goal.progress(currentMiles: currentMiles)
+    }
+    
+    private var milesNeeded: Int {
+        goal.milesNeeded(currentMiles: currentMiles)
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: AviationTheme.Spacing.md) {
+            // 標題列
+            HStack {
+                Image(systemName: "radar")
+                    .font(.body)
+                    .foregroundStyle(AviationTheme.Colors.brandColor(colorScheme))
+                Text("夢想雷達")
+                    .font(AviationTheme.Typography.headline)
+                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+            }
+            
+            // 航線資訊
+            HStack(spacing: 6) {
+                Text(goal.originName)
+                    .font(AviationTheme.Typography.subheadline)
+                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                Image(systemName: goal.isRoundTrip ? "arrow.left.arrow.right" : "arrow.right")
+                    .font(.caption2)
+                    .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                Text(goal.destinationName)
+                    .font(AviationTheme.Typography.headline)
+                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                
+                Text(goal.cabinClass.rawValue)
+                    .font(.system(size: 10))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(AviationTheme.Colors.brandColor(colorScheme).opacity(0.12))
+                    )
+                    .foregroundColor(AviationTheme.Colors.brandColor(colorScheme))
+            }
+            
+            // 進度條
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.15))
+                    
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    AviationTheme.Colors.cathayJade,
+                                    AviationTheme.Colors.cathayJadeLight
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geometry.size.width * min(progress, 1.0))
+                    
+                    // 飛機 icon 在進度前端
+                    if progress > 0.05 {
+                        Image(systemName: "airplane")
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                            .offset(x: max(8, geometry.size.width * min(progress, 1.0) - 20))
+                    }
+                }
+            }
+            .frame(height: 12)
+            
+            // 鼓勵文字
+            HStack {
+                if milesNeeded > 0 {
+                    HStack(spacing: 0) {
+                        Text("還差 ")
+                            .font(AviationTheme.Typography.subheadline)
+                            .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                        Text("\(milesNeeded.formatted())")
+                            .font(AviationTheme.Typography.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(AviationTheme.Colors.brandColor(colorScheme))
+                        Text(" 哩就能免費飛！加油！")
+                            .font(AviationTheme.Typography.subheadline)
+                            .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    }
+                } else {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundColor(AviationTheme.Colors.successColor(colorScheme))
+                        Text("已達成！可以準備出發了")
+                            .font(AviationTheme.Typography.subheadline)
+                            .foregroundColor(AviationTheme.Colors.successColor(colorScheme))
+                    }
+                }
+                
+                Spacer()
+                
+                Text("\(Int(progress * 100))%")
+                    .font(AviationTheme.Typography.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(AviationTheme.Colors.brandColor(colorScheme))
+            }
+        }
+        .padding(AviationTheme.Spacing.lg)
+        .background(AviationTheme.Colors.cardBackground(colorScheme))
+        .cornerRadius(AviationTheme.CornerRadius.xl)
+        .glassEffect(in: .rect(cornerRadius: AviationTheme.CornerRadius.xl))
+        .shadow(
+            color: AviationTheme.Shadows.cardShadow(colorScheme),
+            radius: 8,
+            x: 0,
+            y: 3
+        )
+    }
+}
+
+// MARK: - 本月累積卡片
+struct MonthlyCockpitCard: View {
+    @Environment(\.colorScheme) var colorScheme
+    let viewModel: MileageViewModel
+    
+    var body: some View {
+        let stats = viewModel.monthlyStats()
+        
+        VStack(alignment: .leading, spacing: AviationTheme.Spacing.md) {
+            // 標題
+            HStack {
+                Image(systemName: "gauge.open.with.lines.needle.33percent.and.arrowtriangle")
+                    .font(.body)
+                    .foregroundStyle(AviationTheme.Colors.brandColor(colorScheme))
+                Text("本月駕駛艙")
+                    .font(AviationTheme.Typography.headline)
+                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                Spacer()
+                Text(Date().formatted(.dateTime.month(.wide).locale(Locale(identifier: "zh_TW"))))
+                    .font(AviationTheme.Typography.caption)
+                    .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+            }
+            
+            // 兩欄統計
+            HStack(spacing: AviationTheme.Spacing.md) {
+                // 本月消費
+                VStack(spacing: 6) {
+                    Image(systemName: "wallet.bifold")
+                        .font(.title3)
+                        .foregroundColor(AviationTheme.Colors.warning)
+                    
+                    Text("NT$\(NSDecimalNumber(decimal: stats.totalAmount).intValue.formatted())")
+                        .font(AviationTheme.Typography.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                    
+                    Text("本月消費")
+                        .font(AviationTheme.Typography.caption)
+                        .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(AviationTheme.Spacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
+                        .fill(AviationTheme.Colors.warning.opacity(colorScheme == .dark ? 0.08 : 0.06))
+                )
+                
+                // 本月哩程
+                VStack(spacing: 6) {
+                    Image(systemName: "airplane.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(AviationTheme.Colors.brandColor(colorScheme))
+                    
+                    Text("\(stats.totalMiles.formatted())")
+                        .font(AviationTheme.Typography.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                    
+                    Text("累積哩程")
+                        .font(AviationTheme.Typography.caption)
+                        .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(AviationTheme.Spacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
+                        .fill(AviationTheme.Colors.brandColor(colorScheme).opacity(colorScheme == .dark ? 0.08 : 0.06))
+                )
+            }
+        }
+        .padding(AviationTheme.Spacing.lg)
+        .background(AviationTheme.Colors.cardBackground(colorScheme))
+        .cornerRadius(AviationTheme.CornerRadius.xl)
+        .shadow(
+            color: AviationTheme.Shadows.cardShadow(colorScheme),
+            radius: 8,
+            x: 0,
+            y: 3
+        )
+    }
+}
+
+// MARK: - 最新動態卡片
+struct RecentActivityCard: View {
+    @Environment(\.colorScheme) var colorScheme
+    let transactions: [Transaction]
+    
+    private var recentTransactions: [Transaction] {
+        Array(transactions.prefix(3))
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: AviationTheme.Spacing.md) {
+            // 標題
+            HStack {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.body)
+                    .foregroundStyle(AviationTheme.Colors.brandColor(colorScheme))
+                Text("最新動態")
+                    .font(AviationTheme.Typography.headline)
+                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                Spacer()
+                if !transactions.isEmpty {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                }
+            }
+            
+            if recentTransactions.isEmpty {
+                // 空狀態
+                VStack(spacing: 8) {
+                    Image(systemName: "tray")
+                        .font(.title2)
+                        .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                    Text("尚無交易紀錄")
+                        .font(AviationTheme.Typography.subheadline)
+                        .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                    Text("前往記帳開始累積哩程")
+                        .font(AviationTheme.Typography.caption)
+                        .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(AviationTheme.Spacing.lg)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(recentTransactions.enumerated()), id: \.element.id) { index, transaction in
+                        HStack(spacing: 12) {
+                            // 來源 icon
+                            Image(systemName: transaction.source.icon)
+                                .font(.body)
+                                .foregroundColor(Color(transaction.source.color))
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    Circle()
+                                        .fill(Color(transaction.source.color).opacity(colorScheme == .dark ? 0.15 : 0.1))
+                                )
+                            
+                            // 來源名稱 + 時間
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(transaction.source.rawValue)
+                                    .font(AviationTheme.Typography.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                                
+                                Text(transaction.date, style: .relative)
+                                    .font(AviationTheme.Typography.caption)
+                                    .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                            }
+                            
+                            Spacer()
+                            
+                            // 哩程數
+                            Text("+\(transaction.earnedMiles.formatted())")
+                                .font(AviationTheme.Typography.headline)
+                                .foregroundColor(AviationTheme.Colors.brandColor(colorScheme))
+                        }
+                        .padding(.vertical, 10)
+                        
+                        if index < recentTransactions.count - 1 {
+                            Divider()
+                                .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.2))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(AviationTheme.Spacing.lg)
+        .background(AviationTheme.Colors.cardBackground(colorScheme))
+        .cornerRadius(AviationTheme.CornerRadius.xl)
+        .shadow(
+            color: AviationTheme.Shadows.cardShadow(colorScheme),
+            radius: 8,
+            x: 0,
+            y: 3
+        )
+    }
+}
+
+// MARK: - 到期警示卡片
+struct ExpiryAlertCard: View {
+    @Environment(\.colorScheme) var colorScheme
+    let daysUntilExpiry: Int
+    let expiryDate: Date
+    
+    private var alertColor: Color {
+        daysUntilExpiry < 30 ? AviationTheme.Colors.danger : AviationTheme.Colors.warning
+    }
+    
+    private var alertIcon: String {
+        daysUntilExpiry < 30 ? "exclamationmark.triangle.fill" : "clock.badge.exclamationmark"
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: alertIcon)
+                .font(.title3)
+                .foregroundColor(alertColor)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(daysUntilExpiry < 30 ? "哩程即將到期！" : "哩程到期提醒")
+                    .font(AviationTheme.Typography.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(alertColor)
+                
+                Text("剩餘 \(daysUntilExpiry) 天，請盡快使用或累積新哩程以延長效期")
+                    .font(AviationTheme.Typography.caption)
+                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+            }
+            
+            Spacer()
+        }
+        .padding(AviationTheme.Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
+                .fill(alertColor.opacity(colorScheme == .dark ? 0.12 : 0.08))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.xl)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            AviationTheme.Colors.brandColor(colorScheme).opacity(0.3),
-                            Color.clear
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+            RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
+                .stroke(alertColor.opacity(0.3), lineWidth: 1)
         )
     }
 }

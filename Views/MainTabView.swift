@@ -10,7 +10,6 @@ import SwiftData
 
 struct MainTabView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.colorScheme) var colorScheme
     @AppStorage("userColorScheme") private var userColorScheme: String = "system"
     @State private var viewModel = MileageViewModel()
     
@@ -48,40 +47,12 @@ struct MainTabView: View {
         .preferredColorScheme(preferredColorScheme)
         .onAppear {
             viewModel.initialize(context: modelContext)
-            updateTabBarAppearance()
-        }
-        .onChange(of: colorScheme) { _, _ in
-            updateTabBarAppearance()
-        }
-        .onChange(of: userColorScheme) { _, _ in
-            updateTabBarAppearance()
         }
         .alert("儲存失敗", isPresented: $viewModel.showSaveError) {
             Button("確定", role: .cancel) {}
         } message: {
             Text(viewModel.saveError ?? "未知錯誤")
         }
-    }
-    
-    private func updateTabBarAppearance() {
-        let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(AviationTheme.Colors.cardBackground(colorScheme))
-        
-        // 設定未選中的圖標顏色
-        appearance.stackedLayoutAppearance.normal.iconColor = UIColor(AviationTheme.Colors.silver)
-        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
-            .foregroundColor: UIColor(AviationTheme.Colors.silver)
-        ]
-        
-        // 設定選中的圖標顏色
-        appearance.stackedLayoutAppearance.selected.iconColor = UIColor(AviationTheme.Colors.cathayJade)
-        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
-            .foregroundColor: UIColor(AviationTheme.Colors.cathayJade)
-        ]
-        
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
     }
 }
 
