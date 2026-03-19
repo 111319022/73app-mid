@@ -21,6 +21,7 @@ final class FlightGoal {
     var isPriority: Bool // 是否為優先目標
     var isRoundTrip: Bool // 是否為來回程
     var createdDate: Date
+    var sortOrder: Int // 排序順序（越小越前面，釘選與非釘選分開排序）
     
     init(origin: String,
          destination: String,
@@ -42,6 +43,7 @@ final class FlightGoal {
         self.isPriority = isPriority
         self.isRoundTrip = isRoundTrip
         self.createdDate = Date()
+        self.sortOrder = 0
     }
     
     // 計算進度百分比

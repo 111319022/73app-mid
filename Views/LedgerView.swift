@@ -347,6 +347,14 @@ struct CategoryStatRow: View {
 struct MonthPicker: View {
     @Environment(\.colorScheme) var colorScheme
     @Binding var selectedMonth: Date
+    @State private var showingMonthSelector = false
+    
+    private var formattedMonth: String {
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: selectedMonth)
+        let month = calendar.component(.month, from: selectedMonth)
+        return String(format: "%d/%02d", year, month)
+    }
     
     var body: some View {
         HStack(spacing: AviationTheme.Spacing.md) {
@@ -368,15 +376,20 @@ struct MonthPicker: View {
             
             Spacer()
             
-            VStack(spacing: 2) {
-                Text(selectedMonth.formatted(.dateTime.year()))
-                    .font(AviationTheme.Typography.caption)
-                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                
-                Text(selectedMonth.formatted(.dateTime.month(.wide)))
-                    .font(AviationTheme.Typography.title3)
-                    .fontWeight(.bold)
-                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+            Button {
+                showingMonthSelector = true
+            } label: {
+                HStack(spacing: 6) {
+                    Text(formattedMonth)
+                        .font(AviationTheme.Typography.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                }
             }
             
             Spacer()
@@ -415,11 +428,161 @@ struct MonthPicker: View {
             }
             .disabled(!canGoNext)
         }
+        .sheet(isPresented: $showingMonthSelector) {
+            MonthSelectorSheet(selectedMonth: $selectedMonth)
+                .presentationDetents([.medium])
+        }
     }
     
     var canGoNext: Bool {
         let nextMonth = Calendar.current.date(byAdding: .month, value: 1, to: selectedMonth) ?? Date()
         return nextMonth <= Date()
+    }
+}
+
+// MARK: - 快速月份選擇面板
+struct MonthSelectorSheet: View {
+    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedMonth: Date
+    
+    @State private var displayYear: Int
+    
+    private let calendar = Calendar.current
+    private let columns = [
+        GridItem(.flexible()),
+        GridItem(.flexible()),
+        GridItem(.flexible()),
+        GridItem(.flexible())
+    ]
+    
+    init(selectedMonth: Binding<Date>) {
+        self._selectedMonth = selectedMonth
+        self._displayYear = State(initialValue: Calendar.current.component(.year, from: selectedMonth.wrappedValue))
+    }
+    
+    private var currentYear: Int {
+        calendar.component(.year, from: Date())
+    }
+    
+    private var currentMonth: Int {
+        calendar.component(.month, from: Date())
+    }
+    
+    private var selectedYear: Int {
+        calendar.component(.year, from: selectedMonth)
+    }
+    
+    private var selectedMonthValue: Int {
+        calendar.component(.month, from: selectedMonth)
+    }
+    
+    private func isFutureMonth(_ month: Int) -> Bool {
+        if displayYear > currentYear { return true }
+        if displayYear == currentYear && month > currentMonth { return true }
+        return false
+    }
+    
+    private func isSelected(_ month: Int) -> Bool {
+        displayYear == selectedYear && month == selectedMonthValue
+    }
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: AviationTheme.Spacing.lg) {
+                // 年份選擇
+                HStack {
+                    Button {
+                        displayYear -= 1
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(AviationTheme.Colors.brandColor(colorScheme))
+                    }
+                    
+                    Spacer()
+                    
+                    Text(String(displayYear))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                    
+                    Spacer()
+                    
+                    Button {
+                        if displayYear < currentYear {
+                            displayYear += 1
+                        }
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(displayYear < currentYear ? AviationTheme.Colors.brandColor(colorScheme) : AviationTheme.Colors.tertiaryText(colorScheme))
+                    }
+                    .disabled(displayYear >= currentYear)
+                }
+                .padding(.horizontal, AviationTheme.Spacing.lg)
+                
+                // 月份 Grid
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(1...12, id: \.self) { month in
+                        let future = isFutureMonth(month)
+                        let selected = isSelected(month)
+                        
+                        Button {
+                            if let date = calendar.date(from: DateComponents(year: displayYear, month: month, day: 1)) {
+                                selectedMonth = date
+                                dismiss()
+                            }
+                        } label: {
+                            Text(String(format: "%02d", month))
+                                .font(.system(size: 18, weight: selected ? .bold : .medium, design: .rounded))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
+                                        .fill(
+                                            selected
+                                                ? AviationTheme.Colors.cathayJade
+                                                : AviationTheme.Colors.cardBackground(colorScheme)
+                                        )
+                                )
+                                .foregroundColor(
+                                    selected
+                                        ? .white
+                                        : future
+                                            ? AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.4)
+                                            : AviationTheme.Colors.primaryText(colorScheme)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
+                                        .stroke(
+                                            selected ? AviationTheme.Colors.cathayJade : Color.clear,
+                                            lineWidth: 2
+                                        )
+                                )
+                                .shadow(color: selected ? AviationTheme.Colors.cathayJade.opacity(0.3) : .clear, radius: 4, x: 0, y: 2)
+                        }
+                        .disabled(future)
+                    }
+                }
+                .padding(.horizontal, AviationTheme.Spacing.md)
+                
+                Spacer()
+            }
+            .padding(.top, AviationTheme.Spacing.md)
+            .background(AviationTheme.Colors.background(colorScheme))
+            .navigationTitle("選擇月份")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                    .foregroundColor(AviationTheme.Colors.cathayJade)
+                }
+            }
+        }
     }
 }
 

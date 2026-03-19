@@ -140,6 +140,11 @@ class MileageViewModel {
     func addFlightGoal(_ goal: FlightGoal) {
         guard let context = modelContext, let account = mileageAccount else { return }
         
+        // 自動設定 sortOrder 為同群組的最後一位
+        let sameGroup = flightGoals.filter { $0.isPriority == goal.isPriority }
+        let maxOrder = sameGroup.map { $0.sortOrder }.max() ?? -1
+        goal.sortOrder = maxOrder + 1
+        
         context.insert(goal)
         account.flightGoals.append(goal)
         

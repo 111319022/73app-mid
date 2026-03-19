@@ -12,17 +12,36 @@ struct ProgressView: View {
     @Environment(\.colorScheme) var colorScheme
     @Bindable var viewModel: MileageViewModel
     @State private var showingAddGoal = false
-    
-    var pinnedGoals: [FlightGoal] {
-        viewModel.flightGoals.filter { $0.isPriority }
-    }
+    @State private var selectedGoalIndex = 0
+    @State private var isEditingOrder = false
+    @State private var editingPinnedGoals: [FlightGoal] = []
+    @State private var editingUnpinnedGoals: [FlightGoal] = []
     
     var currentMiles: Int {
         viewModel.mileageAccount?.totalMiles ?? 0
     }
     
-    var nextGoal: FlightGoal? {
-        pinnedGoals.sorted { $0.progress(currentMiles: currentMiles) > $1.progress(currentMiles: currentMiles) }.first
+    /// 半圓進度條顯示的目標列表
+    /// 有釘選 → 所有釘選目標（依 sortOrder）；無釘選 → 第一個目標
+    var heroGoals: [FlightGoal] {
+        let pinned = viewModel.flightGoals.filter { $0.isPriority }
+        if !pinned.isEmpty {
+            return pinned.sorted { $0.sortOrder < $1.sortOrder }
+        }
+        // 無釘選時，顯示第一個目標
+        if let first = viewModel.flightGoals.sorted(by: { $0.createdDate < $1.createdDate }).first {
+            return [first]
+        }
+        return []
+    }
+    
+    /// 所有目標列表（釘選永遠在最上面，各自依 sortOrder 排序）
+    var orderedGoals: [FlightGoal] {
+        let pinned = viewModel.flightGoals.filter { $0.isPriority }
+            .sorted { $0.sortOrder < $1.sortOrder }
+        let unpinned = viewModel.flightGoals.filter { !$0.isPriority }
+            .sorted { $0.sortOrder < $1.sortOrder }
+        return pinned + unpinned
     }
     
     var body: some View {
@@ -33,16 +52,13 @@ struct ProgressView: View {
                     .ignoresSafeArea()
                 
                 ScrollView {
-                    // ✈️ 修改重點 1：將原本的 .xl spacing 增大，並明確調整頂部 padding
-                    VStack(spacing: AviationTheme.Spacing.xl) {
+                    VStack(spacing: AviationTheme.Spacing.md) {
                         // 主視覺：飛機模型與進度圓環
                         mainProgressSection
                         
                         // 所有目標列表
                         allGoalsSection
                     }
-                    // 這裡修改：增加頂部 Padding，將整個內容往下推，拉開與 Navigation Title 的距離
-                    .padding(.top, AviationTheme.Spacing.xl + 10)
                     .padding(.bottom, AviationTheme.Spacing.lg)
                 }
             }
@@ -66,6 +82,21 @@ struct ProgressView: View {
             .sheet(isPresented: $showingAddGoal) {
                 AddFlightGoalView(viewModel: viewModel)
             }
+            .sheet(isPresented: $isEditingOrder) {
+                GoalReorderSheet(
+                    pinnedGoals: $editingPinnedGoals,
+                    unpinnedGoals: $editingUnpinnedGoals,
+                    colorScheme: colorScheme,
+                    onDone: {
+                        for (i, g) in editingPinnedGoals.enumerated() { g.sortOrder = i }
+                        for (i, g) in editingUnpinnedGoals.enumerated() { g.sortOrder = i }
+                        viewModel.saveContext()
+                        viewModel.loadData()
+                        isEditingOrder = false
+                    }
+                )
+                .presentationDetents([.medium, .large])
+            }
             .onChange(of: showingAddGoal) { oldValue, newValue in
                 if !newValue {
                     // Sheet 關閉時重新載入數據
@@ -78,121 +109,107 @@ struct ProgressView: View {
     // MARK: - 主視覺區域
     private var mainProgressSection: some View {
         VStack(spacing: 0) {
-            // 上半圓進度條（內含文字）
-            ZStack {
-                // 背景軌道（上半圓）
-                Circle()
-                    .trim(from: 0, to: 0.5)
-                    .stroke(
-                        AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.2),
-                        lineWidth: 14
-                    )
-                    .frame(width: 300, height: 300)
-                    .rotationEffect(.degrees(180))
-                
-                // 進度填充（上半圓）
-                if let goal = nextGoal {
-                    Circle()
-                        .trim(from: 0, to: min(goal.progress(currentMiles: currentMiles), 1.0) * 0.5)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    AviationTheme.Colors.cathayJade,
-                                    AviationTheme.Colors.cathayJadeLight
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            style: StrokeStyle(lineWidth: 14, lineCap: .round)
+            if heroGoals.isEmpty {
+                emptyProgressView
+                    .frame(height: 230)
+            } else if heroGoals.count == 1 {
+                HalfCircleProgressView(
+                    goal: heroGoals[0],
+                    currentMiles: currentMiles,
+                    colorScheme: colorScheme
+                )
+                .frame(height: 230)
+            } else {
+                TabView(selection: $selectedGoalIndex) {
+                    ForEach(Array(heroGoals.enumerated()), id: \.element.id) { index, goal in
+                        HalfCircleProgressView(
+                            goal: goal,
+                            currentMiles: currentMiles,
+                            colorScheme: colorScheme
                         )
-                        .frame(width: 300, height: 300)
-                        .rotationEffect(.degrees(180))
-                        .animation(.easeInOut(duration: 1.0), value: goal.progress(currentMiles: currentMiles))
-                }
-                
-                // 文字資訊（放在半圓中間）
-                if let goal = nextGoal {
-                    VStack(spacing: 4) {
-                        // 航線
-                        HStack(spacing: 4) {
-                            Text("\(goal.originName) (\(goal.origin))")
-                                .font(AviationTheme.Typography.subheadline)
-                                .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                            
-                            Image(systemName: goal.isRoundTrip ? "arrow.left.arrow.right" : "arrow.right")
-                                .font(.caption2)
-                                .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                            
-                            Text("\(goal.destinationName) (\(goal.destination))")
-                                .font(AviationTheme.Typography.title3)
-                                .fontWeight(.bold)
-                                .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
-                        }
-                        
-                        // 哩程進度
-                        HStack(alignment: .lastTextBaseline, spacing: 3) {
-                            Text("\(currentMiles)")
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                                .foregroundColor(AviationTheme.Colors.cathayJade)
-                            Text("/")
-                                .font(AviationTheme.Typography.body)
-                                .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                            Text("\(goal.requiredMiles)")
-                                .font(AviationTheme.Typography.title3)
-                                .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                            Text("哩")
-                                .font(AviationTheme.Typography.subheadline)
-                                .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
-                        }
-                        
-                        // 進度百分比
-                        Text("\(Int(goal.progress(currentMiles: currentMiles) * 100))%")
-                            .font(AviationTheme.Typography.caption)
-                            .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule()
-                                    .fill(AviationTheme.Colors.cathayJade.opacity(0.15))
-                            )
+                        .tag(index)
                     }
-                    .offset(y: -30)
-                } else {
-                    VStack(spacing: 6) {
-                        Text("尚未設定目標")
-                            .font(AviationTheme.Typography.body)
-                            .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                        
-                        Text("點擊右上角 + 新增航線目標")
-                            .font(AviationTheme.Typography.caption)
-                            .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
-                    }
-                    .offset(y: -30)
                 }
+                .tabViewStyle(.page(indexDisplayMode: .automatic))
+                .frame(height: 230) // 給予固定高度，確保點點有空間
             }
-            .frame(height: 150)
-            .padding(.top, AviationTheme.Spacing.md)
             
-            // 飛機圖片佈局
+            // 飛機圖片佈局（固定不動）
             Image("CathayPacific_plane")
                 .resizable()
                 .scaledToFit()
-                // 將飛機寬度
                 .frame(width: 350)
-                // 貼和程度
-                .padding(.top, -35)
+                // ✈️ 修改重點 2：讓飛機自然往下放，不再使用負數去擠壓，解決壓迫感
+                .padding(.top, 0)
                 .padding(.bottom, 10)
         }
         .padding(.horizontal, AviationTheme.Spacing.md)
     }
     
+    private var emptyProgressView: some View {
+        // 使用底層對齊的 ZStack 取代 offset
+        ZStack(alignment: .bottom) {
+            HalfCirclePath()
+                .stroke(
+                    AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.3),
+                    style: StrokeStyle(lineWidth: 14, lineCap: .round)
+                )
+                .frame(width: 320, height: 160)
+                .padding(.horizontal, 7)
+                .padding(.top, 7)
+            
+            VStack(spacing: 6) {
+                Text("尚未設定目標")
+                    .font(AviationTheme.Typography.body)
+                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                
+                Text("點擊右上角 + 新增航線目標")
+                    .font(AviationTheme.Typography.caption)
+                    .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+            }
+            .padding(.bottom, 30) // 讓文字貼齊圓心底部上方
+        }
+        .padding(.bottom, 25) // 為 TabView 點點預留空間
+    }
+    
     // MARK: - 所有目標列表
     private var allGoalsSection: some View {
         VStack(alignment: .leading, spacing: AviationTheme.Spacing.md) {
-            Text("所有目標")
-                .font(AviationTheme.Typography.headline)
-                .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                .padding(.horizontal, AviationTheme.Spacing.md)
+            // 標題列 + 編輯順序按鈕
+            HStack {
+                Text("所有目標")
+                    .font(AviationTheme.Typography.headline)
+                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                
+                Spacer()
+                
+                if !viewModel.flightGoals.isEmpty {
+                    Button {
+                        editingPinnedGoals = viewModel.flightGoals
+                            .filter { $0.isPriority }
+                            .sorted { $0.sortOrder < $1.sortOrder }
+                        editingUnpinnedGoals = viewModel.flightGoals
+                            .filter { !$0.isPriority }
+                            .sorted { $0.sortOrder < $1.sortOrder }
+                        isEditingOrder = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.up.arrow.down.circle")
+                                .font(.caption)
+                            Text("編輯順序")
+                                .font(AviationTheme.Typography.caption)
+                        }
+                        .foregroundColor(AviationTheme.Colors.cathayJade)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule()
+                                .fill(AviationTheme.Colors.cathayJade.opacity(0.12))
+                        )
+                    }
+                }
+            }
+            .padding(.horizontal, AviationTheme.Spacing.md)
             
             if viewModel.flightGoals.isEmpty {
                 VStack(spacing: AviationTheme.Spacing.md) {
@@ -214,14 +231,225 @@ struct ProgressView: View {
                 .cornerRadius(AviationTheme.CornerRadius.md)
                 .padding(.horizontal, AviationTheme.Spacing.md)
             } else {
+                // 正常模式：顯示完整卡片
                 VStack(spacing: AviationTheme.Spacing.sm) {
-                    ForEach(viewModel.flightGoals.sorted(by: { $0.isPriority && !$1.isPriority })) { goal in
-                        GoalProgressCard(goal: goal, viewModel: viewModel, colorScheme: colorScheme)
+                    ForEach(orderedGoals) { goal in
+                        GoalProgressCard(
+                            goal: goal,
+                            viewModel: viewModel,
+                            colorScheme: colorScheme
+                        )
                     }
                 }
                 .padding(.horizontal, AviationTheme.Spacing.md)
             }
         }
+    }
+}
+
+// MARK: - 半圓進度條元件
+struct HalfCircleProgressView: View {
+    let goal: FlightGoal
+    let currentMiles: Int
+    let colorScheme: ColorScheme
+    
+    private let arcDiameter: CGFloat = 320
+    private let strokeWidth: CGFloat = 14
+    private var radius: CGFloat { arcDiameter / 2 }
+    
+    var body: some View {
+        let progressValue = min(goal.progress(currentMiles: currentMiles), 1.0)
+        
+        ZStack(alignment: .bottom) {
+            // 1. 背景軌道與進度條
+            ZStack {
+                HalfCirclePath()
+                    .stroke(
+                        AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.3),
+                        style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round)
+                    )
+                
+                HalfCirclePath()
+                    // 避免進度為 0 時不渲染，設定最小為 0.001 讓它出現一個起點圓點
+                    .trim(from: 0, to: max(progressValue, 0.001))
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                AviationTheme.Colors.cathayJade,
+                                AviationTheme.Colors.cathayJadeLight
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round)
+                    )
+                    .animation(.easeInOut(duration: 1.0), value: progressValue)
+            }
+            .frame(width: arcDiameter, height: radius)
+            .padding(.horizontal, strokeWidth / 2)
+            .padding(.top, strokeWidth / 2)
+            
+            // 2. 文字資訊
+            VStack(spacing: 8) {
+                HStack(spacing: 4) {
+                    Text("\(goal.originName) (\(goal.origin))")
+                        .font(AviationTheme.Typography.subheadline)
+                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    
+                    Image(systemName: goal.isRoundTrip ? "arrow.left.arrow.right" : "arrow.right")
+                        .font(.caption2)
+                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    
+                    Text("\(goal.destinationName) (\(goal.destination))")
+                        .font(AviationTheme.Typography.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                }
+                
+                HStack(alignment: .lastTextBaseline, spacing: 3) {
+                    Text("\(currentMiles)")
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .foregroundColor(AviationTheme.Colors.cathayJade)
+                    Text("/")
+                        .font(AviationTheme.Typography.title3)
+                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    Text("\(goal.requiredMiles)")
+                        .font(AviationTheme.Typography.title2)
+                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    Text("哩")
+                        .font(AviationTheme.Typography.subheadline)
+                        .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                }
+                
+                Text("\(Int(progressValue * 100))%")
+                    .font(AviationTheme.Typography.caption)
+                    .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(AviationTheme.Colors.cathayJade.opacity(0.15))
+                    )
+            }
+            // ✈️ 修改重點：移除 padding(.bottom)，改用 offset(y) 把整個文字區塊精準往下推
+            .offset(y: 12)
+        }
+        .padding(.bottom, 25) // 為 TabView 的分頁點點預留空間
+    }
+}
+
+// 自訂繪製的半圓形 Path，徹底解決 clipped() 裁切異常的問題
+struct HalfCirclePath: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        
+        let center = CGPoint(x: rect.midX, y: rect.maxY)
+        let radius = rect.width / 2
+        
+        // 畫一個從左（180度）到右（0度）的上半圓
+        path.addArc(
+            center: center,
+            radius: radius,
+            startAngle: .degrees(180),
+            endAngle: .degrees(0),
+            clockwise: false
+        )
+        
+        return path
+    }
+}
+
+// MARK: - 目標排序 Sheet
+struct GoalReorderSheet: View {
+    @Binding var pinnedGoals: [FlightGoal]
+    @Binding var unpinnedGoals: [FlightGoal]
+    let colorScheme: ColorScheme
+    let onDone: () -> Void
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                if !pinnedGoals.isEmpty {
+                    Section {
+                        ForEach(pinnedGoals) { goal in
+                            GoalReorderRow(goal: goal, isPinned: true)
+                        }
+                        .onMove { source, destination in
+                            pinnedGoals.move(fromOffsets: source, toOffset: destination)
+                        }
+                    } header: {
+                        Label("釘選目標", systemImage: "pin.fill")
+                            .font(.caption)
+                            .foregroundColor(AviationTheme.Colors.cathayJade)
+                    }
+                }
+                
+                if !unpinnedGoals.isEmpty {
+                    Section {
+                        ForEach(unpinnedGoals) { goal in
+                            GoalReorderRow(goal: goal, isPinned: false)
+                        }
+                        .onMove { source, destination in
+                            unpinnedGoals.move(fromOffsets: source, toOffset: destination)
+                        }
+                    } header: {
+                        Label("其他目標", systemImage: "location.fill")
+                            .font(.caption)
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .environment(\.editMode, .constant(.active))
+            .navigationTitle("排列順序")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") {
+                        onDone()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 排序用的目標行
+struct GoalReorderRow: View {
+    let goal: FlightGoal
+    let isPinned: Bool
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(goal.originName)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    Image(systemName: goal.isRoundTrip ? "arrow.left.arrow.right" : "arrow.right")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    
+                    Text(goal.destinationName)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+                
+                Text("\(goal.cabinClass.rawValue) · \(goal.requiredMiles) 哩")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            
+            Spacer()
+            
+            if isPinned {
+                Image(systemName: "pin.fill")
+                    .font(.caption)
+                    .foregroundColor(AviationTheme.Colors.cathayJade)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
 
@@ -269,6 +497,10 @@ struct GoalProgressCard: View {
                 
                 Menu {
                     Button {
+                        // 切換釘選時，設定新群組的 sortOrder 為最後一位
+                        let targetGroup = viewModel.flightGoals.filter { $0.isPriority == !goal.isPriority }
+                        let maxOrder = targetGroup.map { $0.sortOrder }.max() ?? -1
+                        goal.sortOrder = maxOrder + 1
                         goal.isPriority.toggle()
                         viewModel.saveContext()
                         viewModel.loadData()
@@ -278,6 +510,8 @@ struct GoalProgressCard: View {
                             systemImage: goal.isPriority ? "pin.slash" : "pin.fill"
                         )
                     }
+                    
+                    Divider()
                     
                     Button(role: .destructive) {
                         showingDeleteAlert = true
