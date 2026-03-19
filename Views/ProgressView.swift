@@ -111,14 +111,14 @@ struct ProgressView: View {
         VStack(spacing: 0) {
             if heroGoals.isEmpty {
                 emptyProgressView
-                    .frame(height: 230)
+                    .frame(height: 250) // ✈️ 加大高度，讓點點可以往下放
             } else if heroGoals.count == 1 {
                 HalfCircleProgressView(
                     goal: heroGoals[0],
                     currentMiles: currentMiles,
                     colorScheme: colorScheme
                 )
-                .frame(height: 230)
+                .frame(height: 250) // ✈️ 加大高度
             } else {
                 TabView(selection: $selectedGoalIndex) {
                     ForEach(Array(heroGoals.enumerated()), id: \.element.id) { index, goal in
@@ -131,7 +131,7 @@ struct ProgressView: View {
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .automatic))
-                .frame(height: 230) // 給予固定高度，確保點點有空間
+                .frame(height: 250) // ✈️ 加大高度，確保點點有足夠的下方空間
             }
             
             // 飛機圖片佈局（固定不動）
@@ -139,8 +139,8 @@ struct ProgressView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 350)
-                // ✈️ 修改重點 2：讓飛機自然往下放，不再使用負數去擠壓，解決壓迫感
-                .padding(.top, 0)
+                // ✈️ 修改重點：加上負 padding 把飛機往上拉，縮小與半圓之間的間隔
+                .padding(.top, -25)
                 .padding(.bottom, 10)
         }
         .padding(.horizontal, AviationTheme.Spacing.md)
@@ -169,7 +169,7 @@ struct ProgressView: View {
             }
             .padding(.bottom, 30) // 讓文字貼齊圓心底部上方
         }
-        .padding(.bottom, 25) // 為 TabView 點點預留空間
+        .padding(.bottom, 35) // ✈️ 加大底部保留空間，把點點往下推
     }
     
     // MARK: - 所有目標列表
@@ -331,14 +331,13 @@ struct HalfCircleProgressView: View {
                             .fill(AviationTheme.Colors.cathayJade.opacity(0.15))
                     )
             }
-            // ✈️ 修改重點：移除 padding(.bottom)，改用 offset(y) 把整個文字區塊精準往下推
             .offset(y: 12)
         }
-        .padding(.bottom, 25) // 為 TabView 的分頁點點預留空間
+        .padding(.bottom, 35) // ✈️ 加大底部保留空間，把 TabView 點點往下推
     }
 }
 
-// 自訂繪製的半圓形 Path，徹底解決 clipped() 裁切異常的問題
+// ✈️ 自訂繪製的半圓形 Path
 struct HalfCirclePath: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
