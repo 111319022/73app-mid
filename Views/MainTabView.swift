@@ -12,6 +12,7 @@ struct MainTabView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("userColorScheme") private var userColorScheme: String = "system"
     @State private var viewModel = MileageViewModel()
+    @State private var selectedTab: Int = 0
     
     var preferredColorScheme: ColorScheme? {
         switch userColorScheme {
@@ -22,23 +23,27 @@ struct MainTabView: View {
     }
     
     var body: some View {
-        TabView {
-            DashboardView(viewModel: viewModel)
+        TabView(selection: $selectedTab) {
+            DashboardView(viewModel: viewModel, switchToProgress: { selectedTab = 1 })
+                .tag(0)
                 .tabItem {
                     Label("儀表板", systemImage: "gauge.with.dots.needle.bottom.50percent")
                 }
             
             ProgressView(viewModel: viewModel)
+                .tag(1)
                 .tabItem {
                     Label("進度", systemImage: "chart.line.uptrend.xyaxis")
                 }
             
             LedgerView(viewModel: viewModel)
+                .tag(2)
                 .tabItem {
                     Label("記帳", systemImage: "book.pages.fill")
                 }
             
             SettingsView(viewModel: viewModel)
+                .tag(3)
                 .tabItem {
                     Label("設定", systemImage: "gearshape.fill")
                 }

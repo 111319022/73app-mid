@@ -11,6 +11,7 @@ import SwiftData
 struct DashboardView: View {
     @Environment(\.colorScheme) var colorScheme
     @Bindable var viewModel: MileageViewModel
+    var switchToProgress: (() -> Void)? = nil
     
     var body: some View {
         NavigationStack {
@@ -45,7 +46,8 @@ struct DashboardView: View {
                            let currentMiles = viewModel.mileageAccount?.totalMiles {
                             DreamRadarCard(
                                 goal: goal,
-                                currentMiles: currentMiles
+                                currentMiles: currentMiles,
+                                onTap: switchToProgress
                             )
                         }
                         
@@ -234,6 +236,7 @@ struct DreamRadarCard: View {
     @Environment(\.colorScheme) var colorScheme
     let goal: FlightGoal
     let currentMiles: Int
+    var onTap: (() -> Void)? = nil
     
     private var progress: Double {
         goal.progress(currentMiles: currentMiles)
@@ -355,6 +358,10 @@ struct DreamRadarCard: View {
             x: 0,
             y: 3
         )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap?()
+        }
     }
 }
 

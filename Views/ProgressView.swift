@@ -14,6 +14,7 @@ struct ProgressView: View {
     @State private var showingAddGoal = false
     @State private var selectedGoalIndex = 0
     @State private var isEditingOrder = false
+    @State private var editingGoal: FlightGoal? = nil
     @State private var editingPinnedGoals: [FlightGoal] = []
     @State private var editingUnpinnedGoals: [FlightGoal] = []
     
@@ -93,9 +94,17 @@ struct ProgressView: View {
                 )
                 .presentationDetents([.medium, .large])
             }
+            .sheet(item: $editingGoal) { goal in
+                EditFlightGoalView(goal: goal, viewModel: viewModel)
+            }
             .onChange(of: showingAddGoal) { oldValue, newValue in
                 if !newValue {
                     // Sheet 關閉時重新載入數據
+                    viewModel.loadData()
+                }
+            }
+            .onChange(of: editingGoal) { oldValue, newValue in
+                if newValue == nil {
                     viewModel.loadData()
                 }
             }
@@ -232,7 +241,8 @@ struct ProgressView: View {
                         GoalProgressCard(
                             goal: goal,
                             viewModel: viewModel,
-                            colorScheme: colorScheme
+                            colorScheme: colorScheme,
+                            onEdit: { editingGoal = goal }
                         )
                     }
                 }
@@ -462,6 +472,7 @@ struct GoalProgressCard: View {
     let goal: FlightGoal
     let viewModel: MileageViewModel
     let colorScheme: ColorScheme
+    var onEdit: (() -> Void)? = nil
     
     @State private var showingDeleteAlert = false
     
@@ -500,6 +511,12 @@ struct GoalProgressCard: View {
                 Spacer()
                 
                 Menu {
+                    Button {
+                        onEdit?()
+                    } label: {
+                        Label("編輯目標", systemImage: "pencil")
+                    }
+                    
                     Button {
                         // 切換釘選時，設定新群組的 sortOrder 為最後一位
                         let targetGroup = viewModel.flightGoals.filter { $0.isPriority == !goal.isPriority }
@@ -579,6 +596,10 @@ struct GoalProgressCard: View {
                     lineWidth: 2
                 )
         )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onEdit?()
+        }
         .alert("確定要刪除此目標？", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) {}
             Button("刪除", role: .destructive) {

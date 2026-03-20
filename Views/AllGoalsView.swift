@@ -14,6 +14,7 @@ struct AllGoalsView: View {
     @Bindable var viewModel: MileageViewModel
     @State private var showingAddGoal = false
     @State private var showingPopularRoutes = false
+    @State private var editingGoal: FlightGoal?
     
     var sortedGoals: [FlightGoal] {
         viewModel.flightGoals.sorted { goal1, goal2 in
@@ -63,6 +64,9 @@ struct AllGoalsView: View {
                                 },
                                 onDelete: {
                                     viewModel.deleteFlightGoal(goal)
+                                },
+                                onEdit: {
+                                    editingGoal = goal
                                 }
                             )
                         }
@@ -101,6 +105,9 @@ struct AllGoalsView: View {
             .sheet(isPresented: $showingPopularRoutes) {
                 PopularRoutesView(viewModel: viewModel)
             }
+            .sheet(item: $editingGoal) { goal in
+                EditFlightGoalView(goal: goal, viewModel: viewModel)
+            }
         }
     }
 }
@@ -112,6 +119,7 @@ struct DetailedFlightGoalCard: View {
     let currentMiles: Int
     let onTogglePriority: () -> Void
     let onDelete: () -> Void
+    var onEdit: (() -> Void)? = nil
     
     @State private var showingDeleteAlert = false
     
@@ -149,6 +157,11 @@ struct DetailedFlightGoalCard: View {
                 Spacer()
                 Menu {
                     Button {
+                        onEdit?()
+                    } label: {
+                        Label("編輯目標", systemImage: "pencil")
+                    }
+                    Button {
                         onTogglePriority()
                     } label: {
                         Label(
@@ -156,6 +169,7 @@ struct DetailedFlightGoalCard: View {
                             systemImage: goal.isPriority ? "pin.slash" : "pin.fill"
                         )
                     }
+                    Divider()
                     Button(role: .destructive) {
                         showingDeleteAlert = true
                     } label: {
@@ -299,6 +313,10 @@ struct DetailedFlightGoalCard: View {
                 .fill(.white)
                 .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
         )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onEdit?()
+        }
         .alert("確定要刪除此目標？", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) {}
             Button("刪除", role: .destructive) {
@@ -313,16 +331,17 @@ struct AddFlightGoalView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) var colorScheme
     @Bindable var viewModel: MileageViewModel
-    @AppStorage("preferredOrigin") private var preferredOrigin: String = "TPE"
+    @AppStorage("preferredOrigin") private var preferredOrigin: String = ""
     
     @State private var selectedOrigin: Airport?
     @State private var selectedDestination: Airport?
     @State private var cabinClass: CabinClass = .economy
-    @State private var isOneworld = false
     @State private var isPriority = false
     @State private var isRoundTrip = false
     @State private var showingOriginPicker = false
     @State private var showingDestinationPicker = false
+    @State private var manualMilesInput: String = ""
+    @FocusState private var isManualMilesFocused: Bool
     
     private var airports = AirportDatabase.shared.getAllAirports()
     
@@ -330,13 +349,52 @@ struct AddFlightGoalView: View {
         self.viewModel = viewModel
     }
     
-    private var calculatedMiles: Int? {
+    /// 判斷是否為國泰可自動計算的航線（起點台北 + 目的地在國泰航點表內）
+    private var isCathayAutoRoute: Bool {
         guard let origin = selectedOrigin?.iataCode,
+              let destination = selectedDestination?.iataCode else { return false }
+        return origin.uppercased() == "TPE" && FlightCalculator.isCathayRouteFromTPE(destination: destination)
+    }
+    
+    /// 起點為台北但目的地不在國泰航點表 → 需兌換寰宇一家夥伴
+    private var isOneworldRequired: Bool {
+        guard let origin = selectedOrigin?.iataCode,
+              selectedDestination != nil else { return false }
+        return origin.uppercased() == "TPE" && !isCathayAutoRoute
+    }
+    
+    /// 起點非台北 → 一律手動輸入
+    private var isNonTPEOrigin: Bool {
+        guard let origin = selectedOrigin?.iataCode else { return false }
+        return origin.uppercased() != "TPE"
+    }
+    
+    /// 是否需要使用者手動輸入哩程
+    private var needsManualMiles: Bool {
+        return isOneworldRequired || isNonTPEOrigin
+    }
+    
+    /// 自動計算的哩程（僅國泰台北航線）
+    private var autoCathayMiles: Int? {
+        guard isCathayAutoRoute,
+              let origin = selectedOrigin?.iataCode,
               let destination = selectedDestination?.iataCode,
               let miles = CathayAwardChart.requiredMiles(from: origin, to: destination, cabinClass: cabinClass) else {
             return nil
         }
         return isRoundTrip ? miles * 2 : miles
+    }
+    
+    /// 手動輸入的哩程
+    private var manualMiles: Int? {
+        guard let value = Int(manualMilesInput), value > 0 else { return nil }
+        return isRoundTrip ? value * 2 : value
+    }
+    
+    /// 最終使用的哩程（自動或手動）
+    private var finalMiles: Int? {
+        if isCathayAutoRoute { return autoCathayMiles }
+        return manualMiles
     }
     
     private var flightDistance: Int? {
@@ -350,6 +408,7 @@ struct AddFlightGoalView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // 航線選擇
                 Section {
                     Button {
                         showingOriginPicker = true
@@ -398,6 +457,7 @@ struct AddFlightGoalView: View {
                     Text("航線")
                 }
                 
+                // 艙等設定
                 Section {
                     Picker("艙等", selection: $cabinClass) {
                         ForEach(CabinClass.allCases, id: \.self) { cabin in
@@ -422,7 +482,85 @@ struct AddFlightGoalView: View {
                     }
                 }
                 
-                if let distance = flightDistance, let miles = calculatedMiles {
+                // 寰宇一家夥伴提醒（台北出發但不在國泰航點表）
+                if selectedOrigin != nil && selectedDestination != nil && isOneworldRequired {
+                    Section {
+                        HStack(spacing: 10) {
+                            Image(systemName: "globe.asia.australia.fill")
+                                .font(.title3)
+                                .foregroundColor(.purple)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("需兌換寰宇一家夥伴航空")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.purple)
+                                Text("此航線非國泰航空直飛，需透過日航、英航等夥伴航空兌換，所需哩程較高")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        HStack {
+                            Text("所需哩程（單程）")
+                            Spacer()
+                            TextField("輸入哩程", text: $manualMilesInput)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 120)
+                                .focused($isManualMilesFocused)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { isManualMilesFocused = true }
+                    } header: {
+                        Text("哩程設定")
+                    } footer: {
+                        if isRoundTrip, let miles = manualMiles {
+                            Text("來回程合計：\(miles.formatted()) 哩")
+                                .font(.caption)
+                        }
+                    }
+                }
+                
+                // 非台北出發 → 一律手動輸入
+                if selectedOrigin != nil && selectedDestination != nil && isNonTPEOrigin {
+                    Section {
+                        HStack(spacing: 10) {
+                            Image(systemName: "info.circle.fill")
+                                .font(.title3)
+                                .foregroundColor(.blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("自訂哩程")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                Text("出發地非台北，請自行查詢並輸入所需哩程")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        HStack {
+                            Text("所需哩程（單程）")
+                            Spacer()
+                            TextField("輸入哩程", text: $manualMilesInput)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 120)
+                                .focused($isManualMilesFocused)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { isManualMilesFocused = true }
+                    } header: {
+                        Text("哩程設定")
+                    } footer: {
+                        if isRoundTrip, let miles = manualMiles {
+                            Text("來回程合計：\(miles.formatted()) 哩")
+                                .font(.caption)
+                        }
+                    }
+                }
+                
+                // 國泰自動計算的航線資訊
+                if isCathayAutoRoute, let distance = flightDistance, let miles = autoCathayMiles {
                     Section {
                         HStack {
                             Text("飛行距離")
@@ -431,10 +569,8 @@ struct AddFlightGoalView: View {
                                 .foregroundStyle(.secondary)
                         }
                         
-                        if let origin = selectedOrigin?.iataCode,
-                           let destination = selectedDestination?.iataCode,
-                           let dist = AirportDatabase.shared.calculateDistance(from: origin, to: destination) {
-                            let zone = FlightCalculator.determineZone(distance: dist, destinationCode: destination)
+                        if let destination = selectedDestination?.iataCode {
+                            let zone = FlightCalculator.determineZone(distance: distance, destinationCode: destination)
                             HStack {
                                 Text("航距級別")
                                 Spacer()
@@ -460,23 +596,14 @@ struct AddFlightGoalView: View {
                     } header: {
                         Text("航線資訊")
                     } footer: {
-                        if isOneworld {
-                            Text("⚠️ 注意：兌換寰宇一家夥伴航空所需哩程會比此數值更高")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                        } else {
-                            Text("此為國泰航空自家航班兌換標準")
-                                .font(.caption)
-                        }
+                        Text("此為國泰航空自家航班兌換標準")
+                            .font(.caption)
                     }
                 }
                 
+                // 其他設定
                 Section {
-                    Toggle("寰宇一家夥伴航空", isOn: $isOneworld)
                     Toggle("釘選至儀表板", isOn: $isPriority)
-                } footer: {
-                    Text("寰宇一家包含日本航空、英國航空、美國航空等夥伴")
-                        .font(.caption)
                 }
             }
             .navigationTitle("新增航線目標")
@@ -501,8 +628,7 @@ struct AddFlightGoalView: View {
                 AirportPickerView(selectedAirport: $selectedDestination, airports: airports)
             }
             .onAppear {
-                // 如果尚未選擇出發地，且有設定常用出發地，則自動填入
-                if selectedOrigin == nil {
+                if selectedOrigin == nil && !preferredOrigin.isEmpty {
                     selectedOrigin = AirportDatabase.shared.getAirport(iataCode: preferredOrigin)
                 }
             }
@@ -510,25 +636,404 @@ struct AddFlightGoalView: View {
     }
     
     private var canSave: Bool {
-        selectedOrigin != nil && selectedDestination != nil && calculatedMiles != nil
+        guard selectedOrigin != nil, selectedDestination != nil else { return false }
+        return finalMiles != nil && (finalMiles ?? 0) > 0
     }
     
     private func saveGoal() {
         guard let origin = selectedOrigin?.iataCode,
-              let destination = selectedDestination?.iataCode else {
-            return
-        }
+              let destination = selectedDestination?.iataCode,
+              let miles = finalMiles else { return }
+        
+        let originAirport = AirportDatabase.shared.getAirport(iataCode: origin)
+        let destinationAirport = AirportDatabase.shared.getAirport(iataCode: destination)
         
         let goal = FlightGoal(
-            fromIATA: origin,
-            toIATA: destination,
+            origin: origin.uppercased(),
+            destination: destination.uppercased(),
+            originName: originAirport?.cityName ?? origin,
+            destinationName: destinationAirport?.cityName ?? destination,
             cabinClass: cabinClass,
-            isOneworld: isOneworld,
+            requiredMiles: miles,
+            isOneworld: isOneworldRequired,
             isPriority: isPriority,
             isRoundTrip: isRoundTrip
         )
         
         viewModel.addFlightGoal(goal)
+        dismiss()
+    }
+}
+
+// 編輯航線目標視圖
+struct EditFlightGoalView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) var colorScheme
+    let goal: FlightGoal
+    @Bindable var viewModel: MileageViewModel
+    
+    @State private var selectedOrigin: Airport?
+    @State private var selectedDestination: Airport?
+    @State private var cabinClass: CabinClass
+    @State private var isPriority: Bool
+    @State private var isRoundTrip: Bool
+    @State private var manualMilesInput: String
+    @State private var showingOriginPicker = false
+    @State private var showingDestinationPicker = false
+    @State private var showingDeleteAlert = false
+    @FocusState private var isManualMilesFocused: Bool
+    
+    private var airports = AirportDatabase.shared.getAllAirports()
+    
+    /// 判斷是否為國泰可自動計算的航線（起點台北 + 目的地在國泰航點表內）
+    private var isCathayAutoRoute: Bool {
+        guard let origin = selectedOrigin?.iataCode,
+              let destination = selectedDestination?.iataCode else { return false }
+        return origin.uppercased() == "TPE" && FlightCalculator.isCathayRouteFromTPE(destination: destination)
+    }
+    
+    /// 起點為台北但目的地不在國泰航點表 → 需兌換寰宇一家夥伴
+    private var isOneworldRequired: Bool {
+        guard let origin = selectedOrigin?.iataCode,
+              selectedDestination != nil else { return false }
+        return origin.uppercased() == "TPE" && !isCathayAutoRoute
+    }
+    
+    /// 起點非台北 → 一律手動輸入
+    private var isNonTPEOrigin: Bool {
+        guard let origin = selectedOrigin?.iataCode else { return false }
+        return origin.uppercased() != "TPE"
+    }
+    
+    /// 是否需要使用者手動輸入哩程
+    private var needsManualMiles: Bool {
+        return isOneworldRequired || isNonTPEOrigin
+    }
+    
+    /// 自動計算的哩程（僅國泰台北航線）
+    private var autoCathayMiles: Int? {
+        guard isCathayAutoRoute,
+              let origin = selectedOrigin?.iataCode,
+              let destination = selectedDestination?.iataCode,
+              let miles = CathayAwardChart.requiredMiles(from: origin, to: destination, cabinClass: cabinClass) else {
+            return nil
+        }
+        return isRoundTrip ? miles * 2 : miles
+    }
+    
+    /// 手動輸入的哩程
+    private var manualMiles: Int? {
+        guard let value = Int(manualMilesInput), value > 0 else { return nil }
+        return isRoundTrip ? value * 2 : value
+    }
+    
+    /// 最終使用的哩程
+    private var finalMiles: Int? {
+        if isCathayAutoRoute { return autoCathayMiles }
+        return manualMiles
+    }
+    
+    private var flightDistance: Int? {
+        guard let origin = selectedOrigin?.iataCode,
+              let destination = selectedDestination?.iataCode else {
+            return nil
+        }
+        return AirportDatabase.shared.calculateDistance(from: origin, to: destination)
+    }
+    
+    init(goal: FlightGoal, viewModel: MileageViewModel) {
+        self.goal = goal
+        self.viewModel = viewModel
+        
+        // 初始化編輯狀態
+        _selectedOrigin = State(initialValue: AirportDatabase.shared.getAirport(iataCode: goal.origin))
+        _selectedDestination = State(initialValue: AirportDatabase.shared.getAirport(iataCode: goal.destination))
+        _cabinClass = State(initialValue: goal.cabinClass)
+        _isPriority = State(initialValue: goal.isPriority)
+        _isRoundTrip = State(initialValue: goal.isRoundTrip)
+        
+        // 如果不是國泰自動航線，需要反推單程哩程作為手動輸入初始值
+        let isAuto = goal.origin.uppercased() == "TPE" && FlightCalculator.isCathayRouteFromTPE(destination: goal.destination)
+        if !isAuto {
+            let singleMiles = goal.isRoundTrip ? goal.requiredMiles / 2 : goal.requiredMiles
+            _manualMilesInput = State(initialValue: "\(singleMiles)")
+        } else {
+            _manualMilesInput = State(initialValue: "")
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                // 航線選擇
+                Section {
+                    Button {
+                        showingOriginPicker = true
+                    } label: {
+                        HStack {
+                            Text("出發地")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            if let airport = selectedOrigin {
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(airport.iataCode)
+                                        .fontWeight(.semibold)
+                                    Text(airport.cityName)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            } else {
+                                Text("請選擇")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    
+                    Button {
+                        showingDestinationPicker = true
+                    } label: {
+                        HStack {
+                            Text("目的地")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            if let airport = selectedDestination {
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(airport.iataCode)
+                                        .fontWeight(.semibold)
+                                    Text(airport.cityName)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            } else {
+                                Text("請選擇")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("航線")
+                }
+                
+                // 艙等設定
+                Section {
+                    Picker("艙等", selection: $cabinClass) {
+                        ForEach(CabinClass.allCases, id: \.self) { cabin in
+                            Label(cabin.rawValue, systemImage: cabin.icon)
+                                .tag(cabin)
+                        }
+                    }
+                    
+                    Toggle(isOn: $isRoundTrip) {
+                        HStack {
+                            Image(systemName: "arrow.left.arrow.right")
+                                .foregroundColor(.blue)
+                            Text("來回程")
+                        }
+                    }
+                } header: {
+                    Text("艙等")
+                } footer: {
+                    if isRoundTrip {
+                        Text("來回程所需哩程為單程的兩倍")
+                            .font(.caption)
+                    }
+                }
+                
+                // 寰宇一家夥伴提醒（台北出發但不在國泰航點表）
+                if selectedOrigin != nil && selectedDestination != nil && isOneworldRequired {
+                    Section {
+                        HStack(spacing: 10) {
+                            Image(systemName: "globe.asia.australia.fill")
+                                .font(.title3)
+                                .foregroundColor(.purple)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("需兌換寰宇一家夥伴航空")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.purple)
+                                Text("此航線非國泰航空直飛，需透過日航、英航等夥伴航空兌換，所需哩程較高")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        HStack {
+                            Text("所需哩程（單程）")
+                            Spacer()
+                            TextField("輸入哩程", text: $manualMilesInput)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 120)
+                                .focused($isManualMilesFocused)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { isManualMilesFocused = true }
+                    } header: {
+                        Text("哩程設定")
+                    } footer: {
+                        if isRoundTrip, let miles = manualMiles {
+                            Text("來回程合計：\(miles.formatted()) 哩")
+                                .font(.caption)
+                        }
+                    }
+                }
+                
+                // 非台北出發 → 一律手動輸入
+                if selectedOrigin != nil && selectedDestination != nil && isNonTPEOrigin {
+                    Section {
+                        HStack(spacing: 10) {
+                            Image(systemName: "info.circle.fill")
+                                .font(.title3)
+                                .foregroundColor(.blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("自訂哩程")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                Text("出發地非台北，請自行查詢並輸入所需哩程")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        HStack {
+                            Text("所需哩程（單程）")
+                            Spacer()
+                            TextField("輸入哩程", text: $manualMilesInput)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 120)
+                                .focused($isManualMilesFocused)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { isManualMilesFocused = true }
+                    } header: {
+                        Text("哩程設定")
+                    } footer: {
+                        if isRoundTrip, let miles = manualMiles {
+                            Text("來回程合計：\(miles.formatted()) 哩")
+                                .font(.caption)
+                        }
+                    }
+                }
+                
+                // 國泰自動計算的航線資訊
+                if isCathayAutoRoute, let distance = flightDistance, let miles = autoCathayMiles {
+                    Section {
+                        HStack {
+                            Text("飛行距離")
+                            Spacer()
+                            Text("\(distance.formatted()) 哩")
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        if let destination = selectedDestination?.iataCode {
+                            let zone = FlightCalculator.determineZone(distance: distance, destinationCode: destination)
+                            HStack {
+                                Text("航距級別")
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(zone.rawValue)
+                                        .foregroundStyle(.orange)
+                                    Text(zone.distanceRange)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        
+                        HStack {
+                            Text("所需哩程")
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text("\(miles.formatted())")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundStyle(AviationTheme.Colors.successColor(colorScheme))
+                        }
+                    } header: {
+                        Text("航線資訊")
+                    } footer: {
+                        Text("此為國泰航空自家航班兌換標準")
+                            .font(.caption)
+                    }
+                }
+                
+                // 其他設定
+                Section {
+                    Toggle("釘選至儀表板", isOn: $isPriority)
+                }
+                
+                // 刪除按鈕
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Label("刪除此目標", systemImage: "trash")
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("編輯目標")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("儲存") {
+                        saveChanges()
+                    }
+                    .disabled(!canSave)
+                }
+            }
+            .sheet(isPresented: $showingOriginPicker) {
+                AirportPickerView(selectedAirport: $selectedOrigin, airports: airports)
+            }
+            .sheet(isPresented: $showingDestinationPicker) {
+                AirportPickerView(selectedAirport: $selectedDestination, airports: airports)
+            }
+            .alert("確定要刪除此目標？", isPresented: $showingDeleteAlert) {
+                Button("取消", role: .cancel) {}
+                Button("刪除", role: .destructive) {
+                    viewModel.deleteFlightGoal(goal)
+                    dismiss()
+                }
+            } message: {
+                Text("刪除後將無法復原")
+            }
+        }
+    }
+    
+    private var canSave: Bool {
+        guard selectedOrigin != nil, selectedDestination != nil else { return false }
+        return finalMiles != nil && (finalMiles ?? 0) > 0
+    }
+    
+    private func saveChanges() {
+        guard let origin = selectedOrigin?.iataCode,
+              let destination = selectedDestination?.iataCode,
+              let miles = finalMiles else { return }
+        
+        let originAirport = AirportDatabase.shared.getAirport(iataCode: origin)
+        let destinationAirport = AirportDatabase.shared.getAirport(iataCode: destination)
+        
+        goal.origin = origin.uppercased()
+        goal.destination = destination.uppercased()
+        goal.originName = originAirport?.cityName ?? origin
+        goal.destinationName = destinationAirport?.cityName ?? destination
+        goal.cabinClass = cabinClass
+        goal.isPriority = isPriority
+        goal.isRoundTrip = isRoundTrip
+        goal.requiredMiles = miles
+        goal.isOneworld = isOneworldRequired
+        
+        viewModel.saveContext()
+        viewModel.loadData()
         dismiss()
     }
 }

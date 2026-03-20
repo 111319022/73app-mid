@@ -127,7 +127,7 @@ struct SettingsView: View {
                                     SettingRow(
                                         icon: "airplane.departure",
                                         title: "常用出發地",
-                                        subtitle: AirportDatabase.shared.getAirport(iataCode: preferredOrigin)?.cityName ?? "台北"
+                                        subtitle: preferredOrigin.isEmpty ? "未設定" : (AirportDatabase.shared.getAirport(iataCode: preferredOrigin)?.cityName ?? preferredOrigin)
                                     ) {
                                         Image(systemName: "chevron.right")
                                             .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
@@ -162,7 +162,9 @@ struct SettingsView: View {
                                     title: "版本資訊",
                                     subtitle: nil
                                 ) {
-                                    Text("1.0.0")
+                                    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+                                    let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+                                    Text("\(version) (\(build))")
                                         .font(AviationTheme.Typography.subheadline)
                                         .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
                                 }

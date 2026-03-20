@@ -24,7 +24,11 @@ struct CalculatorLedgerView: View {
     @State private var conversionSource: String = "" // 銀行點數兌換/他點轉入：來源
     @State private var merchantName: String = "" // 特店消費累積：商家名稱
     @State private var promotionName: String = "" // 活動贈送：活動名稱
-    @FocusState private var isAnyFieldFocused: Bool
+    @FocusState private var focusedField: TransactionField?
+    
+    enum TransactionField {
+        case amount, miles
+    }
     
     var activeCards: [CreditCardRule] {
         viewModel.creditCards.filter { $0.isActive }
@@ -119,7 +123,7 @@ struct CalculatorLedgerView: View {
             }
         }
         .onTapGesture {
-            isAnyFieldFocused = false
+            focusedField = nil
         }
     }
     
@@ -259,13 +263,15 @@ struct CalculatorLedgerView: View {
                             .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
                             .multilineTextAlignment(.trailing)
                             .frame(maxWidth: 120)
-                            .focused($isAnyFieldFocused)
+                            .focused($focusedField, equals: .amount)
                             .onChange(of: amount) { _, newValue in
                                 amount = sanitizeDecimalInput(newValue)
                             }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
+                    .contentShape(Rectangle())
+                    .onTapGesture { focusedField = .amount }
                     
                     // 自動計算的哩程結果
                     if let info = calculatedMilesDisplay {
@@ -318,7 +324,7 @@ struct CalculatorLedgerView: View {
                             .foregroundColor(AviationTheme.Colors.cathayJade)
                             .multilineTextAlignment(.trailing)
                             .frame(maxWidth: 120)
-                            .focused($isAnyFieldFocused)
+                            .focused($focusedField, equals: .miles)
                             .onChange(of: earnedMiles) { _, newValue in
                                 let filtered = newValue.filter { $0.isNumber }
                                 if filtered != newValue { earnedMiles = filtered }
@@ -329,6 +335,8 @@ struct CalculatorLedgerView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
+                    .contentShape(Rectangle())
+                    .onTapGesture { focusedField = .miles }
                 }
             }
             .background(AviationTheme.Colors.cardBackground(colorScheme))

@@ -217,6 +217,33 @@ class FlightCalculator {
     }
 }
 
+// 國泰航空台北直飛/經香港轉機可兌換航點
+// 出發地為台北時，目的地在此清單中 → 使用國泰自動計算邏輯
+// 目的地不在此清單中 → 需兌換寰宇一家夥伴，使用者自行輸入哩程
+extension FlightCalculator {
+    
+    /// 國泰航空從台北出發可兌換的目的地 IATA 代碼集合
+    static let cathayTPEDirectRoutes: Set<String> = [
+        "HKG",  // 香港          7,000 起
+        "PVG",  // 上海          9,000 起
+        "ICN",  // 首爾（經香港）  9,000 起
+        "SIN",  // 新加坡（經香港）9,000 起
+        "SGN",  // 胡志明市（經香港）9,000 起
+        "KUL",  // 吉隆坡（經香港）9,000 起
+        "KIX",  // 大阪          13,000 起
+        "NGO",  // 名古屋        13,000 起
+        "NRT",  // 東京成田       13,000 起
+        "CTS",  // 札幌（經香港）  13,000 起
+        "BKK",  // 曼谷（經香港）  13,000 起
+        "DPS",  // 峇里島（經香港）13,000 起
+    ]
+    
+    /// 檢查從台北出發是否為國泰可兌換航線
+    static func isCathayRouteFromTPE(destination: String) -> Bool {
+        return cathayTPEDirectRoutes.contains(destination.uppercased())
+    }
+}
+
 // 舊版相容性支援（保留舊的 CathayAwardChart 結構）
 struct CathayAwardChart {
     
@@ -356,3 +383,4 @@ extension FlightGoal {
         ]
     }
 }
+
