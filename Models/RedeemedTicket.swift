@@ -1,10 +1,3 @@
-//
-//  RedeemedTicket.swift
-//  73app-mid
-//
-//  Created by GitHub Copilot on 2026/3/20.
-//
-
 import Foundation
 import SwiftData
 

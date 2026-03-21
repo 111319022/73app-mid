@@ -1,21 +1,7 @@
-//
-//  MilestonesView.swift
-//  73app-mid
-//
-//  Created by Ray Hsu on 2026/3/20.
-//
-
-
-
 import SwiftUI
-
 import MapKit
-
 import CoreLocation
-
 import SwiftData
-
-
 
 // MARK: - Main View
 

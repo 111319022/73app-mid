@@ -1,15 +1,8 @@
-//
-//  _3app_midApp.swift
-//  73app-mid
-//
-//  Created by Ray Hsu on 2026/3/16.
-//
-
 import SwiftUI
 import SwiftData
 
 @main
-struct _3app_midApp: App {
+struct MileryApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             MileageAccount.self,

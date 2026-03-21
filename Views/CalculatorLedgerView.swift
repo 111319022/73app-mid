@@ -1,10 +1,3 @@
-//
-//  CalculatorLedgerView.swift
-//  73app-mid
-//
-//  Created by Ray Hsu on 2026/3/16.
-//
-
 import SwiftUI
 import SwiftData
 

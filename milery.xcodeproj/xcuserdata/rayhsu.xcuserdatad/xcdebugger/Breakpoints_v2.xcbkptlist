@@ -78,8 +78,8 @@
             filePath = "Models/CreditCardRule.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "175"
-            endingLineNumber = "175"
+            startingLineNumber = "168"
+            endingLineNumber = "168"
             landmarkName = "CathayCardTier"
             landmarkType = "13">
          </BreakpointContent>
@@ -94,10 +94,10 @@
             filePath = "Models/FlightGoal.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "29"
-            endingLineNumber = "29"
-            landmarkName = "init(origin:destination:originName:destinationName:cabinClass:requiredMiles:isOneworld:isPriority:isRoundTrip:)"
-            landmarkType = "7">
+            startingLineNumber = "22"
+            endingLineNumber = "22"
+            landmarkName = "FlightGoal"
+            landmarkType = "3">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

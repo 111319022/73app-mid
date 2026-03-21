@@ -1,10 +1,3 @@
-//
-//  AviationTheme.swift
-//  73app-mid
-//
-//  Created by Ray Hsu on 2026/3/16.
-//
-
 import SwiftUI
 
 // 航空風格主題系統 - 支援深色/淺色雙模式

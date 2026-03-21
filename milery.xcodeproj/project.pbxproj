@@ -16,7 +16,7 @@
 		FBF89DAF2F6AC2EE003DB1EB /* airports.csv in Resources */ = {isa = PBXBuildFile; fileRef = FBF89D992F6AC2EE003DB1EB /* airports.csv */; };
 		FBF89DB02F6AC2EE003DB1EB /* CalculatorLedgerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89DA42F6AC2EE003DB1EB /* CalculatorLedgerView.swift */; };
 		FBF89DB12F6AC2EE003DB1EB /* ProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89DA92F6AC2EE003DB1EB /* ProgressView.swift */; };
-		FBF89DB22F6AC2EE003DB1EB /* _3app_midApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89D942F6AC2EE003DB1EB /* _3app_midApp.swift */; };
+		FBF89DB22F6AC2EE003DB1EB /* MileryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89D942F6AC2EE003DB1EB /* MileryApp.swift */; };
 		FBF89DB32F6AC2EE003DB1EB /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89DA82F6AC2EE003DB1EB /* MainTabView.swift */; };
 		FBF89DB42F6AC2EE003DB1EB /* MileageAccount.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89D9E2F6AC2EE003DB1EB /* MileageAccount.swift */; };
 		FBF89DB52F6AC2EE003DB1EB /* Transaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF89D9F2F6AC2EE003DB1EB /* Transaction.swift */; };
@@ -40,7 +40,7 @@
 		FBCA10202F70000100A1B2C3 /* RedeemedTicket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedeemedTicket.swift; sourceTree = "<group>"; };
 		FBCA10222F70000200A1B2C3 /* MilestonesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestonesView.swift; sourceTree = "<group>"; };
 		FBF2F7CA2F6D333F0047DCE8 /* EditTransactionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditTransactionView.swift; sourceTree = "<group>"; };
-		FBF89D942F6AC2EE003DB1EB /* _3app_midApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = _3app_midApp.swift; sourceTree = "<group>"; };
+		FBF89D942F6AC2EE003DB1EB /* MileryApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MileryApp.swift; sourceTree = "<group>"; };
 		FBF89D962F6AC2EE003DB1EB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FBF89D972F6AC2EE003DB1EB /* AviationTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AviationTheme.swift; sourceTree = "<group>"; };
 		FBF89D982F6AC2EE003DB1EB /* AirportDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirportDatabase.swift; sourceTree = "<group>"; };
@@ -79,7 +79,7 @@
 		FBB3ADD12F67A60600D7ADE3 = {
 			isa = PBXGroup;
 			children = (
-				FBF89D942F6AC2EE003DB1EB /* _3app_midApp.swift */,
+				FBF89D942F6AC2EE003DB1EB /* MileryApp.swift */,
 				FBAF67442F6E7F2D0041B0C9 /* milery.xcodeproj */,
 				FBF89D962F6AC2EE003DB1EB /* Assets.xcassets */,
 				FBF89D972F6AC2EE003DB1EB /* AviationTheme.swift */,
@@ -229,7 +229,7 @@
 				FBF89DB02F6AC2EE003DB1EB /* CalculatorLedgerView.swift in Sources */,
 				FBCA10232F70000200A1B2C3 /* MilestonesView.swift in Sources */,
 				FBF89DB12F6AC2EE003DB1EB /* ProgressView.swift in Sources */,
-				FBF89DB22F6AC2EE003DB1EB /* _3app_midApp.swift in Sources */,
+				FBF89DB22F6AC2EE003DB1EB /* MileryApp.swift in Sources */,
 				FBF2F7CB2F6D333F0047DCE8 /* EditTransactionView.swift in Sources */,
 				FB419C212F6B1C3B00A30AF9 /* CalculatorComponents.swift in Sources */,
 				FBF89DB32F6AC2EE003DB1EB /* MainTabView.swift in Sources */,
@@ -380,7 +380,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = 45SQT63B67;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -417,7 +417,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = 45SQT63B67;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;

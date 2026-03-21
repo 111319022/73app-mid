@@ -1,10 +1,3 @@
-//
-//  CalculatorComponents.swift
-//  73app-mid
-//
-//  從 CalculatorLedgerView.swift 拆分出的輔助視圖元件
-//
-
 import SwiftUI
 
 // 計算哩程資訊

@@ -1,10 +1,3 @@
-//
-//  CathayAwardChart.swift
-//  73app-mid
-//
-//  Created by Ray Hsu on 2026/3/16.
-//
-
 import Foundation
 
 // 亞洲萬里通航距級別（最新版本 2026）
