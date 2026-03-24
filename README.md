@@ -12,7 +12,7 @@ Milery是一款專為航空常客與哩程使用者開發之 iOS 原生應用程
 
 目前提供正式上架版本與Testflight測試版本，可透過以下管道取得：
 
-* **App Store 正式版:** Apple審核中
+* **App Store 正式版:** [點此下載](https://apps.apple.com/tw/app/milery-%E5%B0%88%E7%82%BA%E5%93%A9%E7%A8%8B%E7%8E%A9%E5%AE%B6%E6%89%93%E9%80%A0/id6760928932)
 * **TestFlight 公測版:** [點此加入 TestFlight 測試計畫](https://testflight.apple.com/join/gWaMP1w2)
 
 ## 核心系統模組
