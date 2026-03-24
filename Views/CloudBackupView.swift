@@ -281,7 +281,8 @@ struct CloudBackupView: View {
     }
     
     private var dataSummaryText: String {
-        "\(viewModel.transactions.count) 筆交易、\(viewModel.flightGoals.count) 個目標、\(viewModel.creditCards.count) 張信用卡、\(viewModel.redeemedTickets.count) 張機票"
+        let activeCardCount = viewModel.creditCards.filter { $0.isActive }.count
+        return "\(viewModel.transactions.count) 筆交易、\(viewModel.flightGoals.count) 個目標、\(activeCardCount) 張已啟用信用卡、\(viewModel.redeemedTickets.count) 張機票"
     }
     
     // MARK: - Actions

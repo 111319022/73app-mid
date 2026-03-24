@@ -296,7 +296,10 @@ class CloudBackupService {
         record["backupDate"] = Date() as CKRecordValue
         record["deviceName"] = UIDevice.current.name as CKRecordValue
         record["schemaVersion"] = 1 as CKRecordValue
-        record["recordCounts"] = "\(transactions.count) 筆交易、\(flightGoals.count) 個目標、\(creditCards.count) 張信用卡、\(redeemedTickets.count) 張機票" as CKRecordValue
+        let cathayActive = UserDefaults.standard.object(forKey: "card_cathay_active") as? Bool ?? true
+        let taishinActive = UserDefaults.standard.object(forKey: "card_taishin_active") as? Bool ?? false
+        let activeCardCount = (cathayActive ? 1 : 0) + (taishinActive ? 1 : 0)
+        record["recordCounts"] = "\(transactions.count) 筆交易、\(flightGoals.count) 個目標、\(activeCardCount) 張已啟用信用卡、\(redeemedTickets.count) 張機票" as CKRecordValue
         record["backupData"] = CKAsset(fileURL: tempURL)
         
         do {
