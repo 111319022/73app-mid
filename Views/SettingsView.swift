@@ -13,9 +13,9 @@ struct SettingsView: View {
     @State private var showingAirportPicker = false
     @State private var versionTapCount = 0
     @State private var isDeveloperModeEnabled = false
-    @State private var showingDevPasswordAlert = false
-    @State private var devPasswordInput = ""
-    @AppStorage("developerPassword") private var developerPassword: String = "7373"
+    @State private var isCheckingDeveloperAccess = false
+    @State private var showingDeveloperAccessAlert = false
+    @State private var developerAccessMessage = ""
     @AppStorage("lastBackupDate") private var lastBackupDateTimestamp: Double = 0
     @AppStorage("cloudKitSyncEnabled") private var cloudKitSyncEnabled: Bool = true
     @State private var showingSyncRestartAlert = false
@@ -205,17 +205,25 @@ struct SettingsView: View {
                             SectionHeaderView(title: "關於", colorScheme: colorScheme)
                             
                             VStack(spacing: 0) {
-                                Button(action: handleVersionTap) {
+                                Button(action: {
+                                    guard !isCheckingDeveloperAccess else { return }
+                                    handleVersionTap()
+                                }) {
                                     SettingRow(
                                         icon: "info.circle.fill",
                                         title: "版本資訊",
                                         subtitle: nil
                                     ) {
-                                        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
-                                        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
-                                        Text("\(version) (\(build))")
-                                            .font(AviationTheme.Typography.subheadline)
-                                            .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                                        if isCheckingDeveloperAccess {
+                                            SwiftUI.ProgressView()
+                                                .scaleEffect(0.85)
+                                        } else {
+                                            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+                                            let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+                                            Text("\(version) (\(build))")
+                                                .font(AviationTheme.Typography.subheadline)
+                                                .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                                        }
                                     }
                                 }
                                 .buttonStyle(.plain)
@@ -311,17 +319,10 @@ struct SettingsView: View {
             .sheet(isPresented: $showingAirportPicker) {
                 SettingsAirportPickerWrapper(selectedCode: $preferredOrigin)
             }
-            .alert("開發者模式", isPresented: $showingDevPasswordAlert) {
-                SecureField("請輸入四位數密碼", text: $devPasswordInput)
-                    .keyboardType(.numberPad)
-                Button("確認") {
-                    if devPasswordInput == developerPassword {
-                        isDeveloperModeEnabled = true
-                    }
-                }
-                Button("取消", role: .cancel) { }
+            .alert("開發者權限驗證", isPresented: $showingDeveloperAccessAlert) {
+                Button("確定", role: .cancel) { }
             } message: {
-                Text("請輸入密碼以啟用開發者模式")
+                Text(developerAccessMessage)
             }
             .alert("需要重新啟動", isPresented: $showingSyncRestartAlert) {
                 Button("我知道了", role: .cancel) { }
@@ -342,11 +343,30 @@ struct SettingsView: View {
                 versionTapCount = 0
             }
         } else {
-            // 未啟用開發者模式，點 10 次彈出密碼輸入
+            // 未啟用開發者模式，點 10 次做 CloudKit 白名單驗證
             if versionTapCount >= 10 {
-                devPasswordInput = ""
-                showingDevPasswordAlert = true
                 versionTapCount = 0
+                validateDeveloperAccessByCloudKit()
+            }
+        }
+    }
+
+    private func validateDeveloperAccessByCloudKit() {
+        guard !isCheckingDeveloperAccess else { return }
+        isCheckingDeveloperAccess = true
+
+        Task {
+            let result = await DeveloperAccessService.shared.verifyCurrentUserAccess()
+            isCheckingDeveloperAccess = false
+
+            switch result {
+            case .allowed:
+                isDeveloperModeEnabled = true
+                appLog("[DevAccess] CloudKit 白名單驗證通過")
+            case .denied(let message):
+                developerAccessMessage = message
+                showingDeveloperAccessAlert = true
+                appLog("[DevAccess] CloudKit 白名單驗證失敗：\(message)")
             }
         }
     }

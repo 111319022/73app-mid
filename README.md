@@ -120,6 +120,19 @@ Milery是一款專為航空常客與哩程使用者開發之 iOS 原生應用程
 
 > 開發者密碼僅提供內部開發人員使用，請洽開發團隊取得。
 
+### CloudKit 白名單設定規格
+
+為避免後續維運時忘記開發者白名單 record 的用途與名稱，請固定使用以下規格：
+
+* Database: Public Database
+* Record Type: DevAccessPolicy
+* Record Name: main-dev-access-policy
+* Fields:
+  * enabled (Bool)
+  * allowedUserHashes (String List)
+
+備註：App 端目前會直接讀取上述固定 Record Name。若名稱改動，需同步調整程式碼中的 `DeveloperAccessService`。
+
 ### 各工具頁用途說明
 
 * **機場資料列表** (`Views/DevViews/AirportListView.swift`)
