@@ -82,19 +82,20 @@ Milery是一款專為航空常客與哩程使用者開發之 iOS 原生應用程
   UI 畫面與元件，涵蓋儀表板、計算器、里程本與設定頁。
   * **`DevViews/`** 開發者模式專用頁面（詳細請見下方「開發者模式專區」）。
 * **`Service/`**
-  服務層，包含 CloudKit 備份與還原等後端邏輯。
+  服務層，包含 CloudKit 備份與還原、開發者白名單驗證等邏輯。
 * **`milery.xcodeproj/`**
   Xcode 專案設定與建置檔案。
 
 ## 開發者模式專區（Developer Tools）
 
-❗️本區塊僅供內部開發與維運人員使用與參考，目的是加速除錯、資料檢查與同步診斷流程。
+> 本區塊僅供內部開發與維運人員使用與參考，目的是加速除錯、資料檢查與同步診斷流程。
+> 開發者權限採 CloudKit 白名單管理，需由內部管理者加入使用者識別碼（hash）。需要者請洽開發人員。
 
 ### 開發者功能樹狀圖
 
 ```text
 設定
-└── 開發者（隱藏，需密碼啟用）
+└── 開發者（隱藏，需 CloudKit 白名單驗證）
     ├── 機場資料列表（AirportListView.swift）
     │   └── 搜尋 CSV 機場資料、協助完善 AirportDatabase
     ├── 分頁顯示管理（TabVisibilitySettingsView.swift）
@@ -116,22 +117,8 @@ Milery是一款專為航空常客與哩程使用者開發之 iOS 原生應用程
 
 1. 進入「設定」。
 2. 連續點擊「版本資訊」10 次。
-3. 輸入開發者密碼後，顯示「開發者」區塊。
-
-> 開發者密碼僅提供內部開發人員使用，請洽開發團隊取得。
-
-### CloudKit 白名單設定規格
-
-為避免後續維運時忘記開發者白名單 record 的用途與名稱，請固定使用以下規格：
-
-* Database: Public Database
-* Record Type: DevAccessPolicy
-* Record Name: main-dev-access-policy
-* Fields:
-  * enabled (Bool)
-  * allowedUserHashes (String List)
-
-備註：App 端目前會直接讀取上述固定 Record Name。若名稱改動，需同步調整程式碼中的 `DeveloperAccessService`。
+3. App 會自動進行 CloudKit 白名單驗證。
+4. 驗證通過後，顯示「開發者」區塊。
 
 ### 各工具頁用途說明
 
