@@ -21,7 +21,9 @@ struct SettingsView: View {
     private var lastBackupText: String {
         if lastBackupDateTimestamp > 0 {
             let date = Date(timeIntervalSince1970: lastBackupDateTimestamp)
-            return date.formatted(.dateTime.month().day().hour().minute())
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy/MM/dd HH:mm"
+            return formatter.string(from: date)
         }
         return "尚未備份"
     }

@@ -21,6 +21,12 @@ struct CloudBackupView: View {
         lastBackupDateTimestamp > 0 ? Date(timeIntervalSince1970: lastBackupDateTimestamp) : nil
     }
     
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy/MM/dd HH:mm"
+        return f
+    }()
+    
     var body: some View {
         ZStack {
             AviationTheme.Gradients.dashboardBackground(colorScheme)
@@ -29,90 +35,82 @@ struct CloudBackupView: View {
             ScrollView {
                 VStack(spacing: AviationTheme.Spacing.xl) {
                     
-                    // MARK: - 備份狀態
-                    VStack(alignment: .leading, spacing: 8) {
-                        SectionHeaderView(title: "備份狀態", colorScheme: colorScheme)
+                    // MARK: - 建立備份（主要行動區）
+                    VStack(spacing: 16) {
+                        // 備份按鈕
+                        Button {
+                            Task { await performBackup() }
+                        } label: {
+                            HStack(spacing: 14) {
+                                if backupService.isUploading {
+                                    SwiftUI.ProgressView()
+                                        .tint(.white)
+                                } else {
+                                    Image(systemName: "icloud.and.arrow.up.fill")
+                                        .font(.title2)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(backupService.isUploading
+                                         ? backupService.uploadProgress
+                                         : "備份到 iCloud")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                    Text(dataSummaryText)
+                                        .font(.caption)
+                                        .opacity(0.85)
+                                }
+                                
+                                Spacer()
+                                
+                                if !backupService.isUploading {
+                                    Image(systemName: "chevron.right")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .opacity(0.7)
+                                }
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 18)
+                            .background(
+                                LinearGradient(
+                                    colors: [AviationTheme.Colors.cathayJade, AviationTheme.Colors.cathayJade.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
+                            .shadow(color: AviationTheme.Colors.cathayJade.opacity(0.3), radius: 12, x: 0, y: 4)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(backupService.isUploading || backupService.iCloudAvailable != true)
                         
-                        VStack(spacing: 0) {
-                            // 上次備份時間
-                            SettingRow(
-                                icon: "clock.arrow.circlepath",
-                                title: "上次備份",
-                                subtitle: nil
-                            ) {
+                        // 狀態列：上次備份 + iCloud 狀態
+                        HStack(spacing: 0) {
+                            // 上次備份
+                            HStack(spacing: 6) {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .font(.caption)
+                                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
                                 Text(lastBackupDateText)
-                                    .font(AviationTheme.Typography.subheadline)
+                                    .font(.caption)
                                     .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
                             }
                             
-                            CustomDivider(colorScheme: colorScheme)
+                            Spacer()
                             
                             // iCloud 狀態
-                            SettingRow(
-                                icon: "icloud.fill",
-                                title: "iCloud 狀態",
-                                subtitle: nil
-                            ) {
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(iCloudStatusColor)
-                                        .frame(width: 8, height: 8)
-                                    Text(iCloudStatusText)
-                                        .font(AviationTheme.Typography.subheadline)
-                                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                                }
+                            HStack(spacing: 5) {
+                                Circle()
+                                    .fill(iCloudStatusColor)
+                                    .frame(width: 7, height: 7)
+                                Text("iCloud \(iCloudStatusText)")
+                                    .font(.caption)
+                                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
                             }
                         }
-                        .background(AviationTheme.Colors.cardBackground(colorScheme))
-                        .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
-                        .shadow(color: AviationTheme.Shadows.cardShadow(colorScheme).opacity(0.5), radius: 8, x: 0, y: 2)
-                    }
-                    .padding(.horizontal, AviationTheme.Spacing.md)
-                    
-                    // MARK: - 建立備份
-                    VStack(alignment: .leading, spacing: 8) {
-                        SectionHeaderView(title: "建立備份", colorScheme: colorScheme)
-                        
-                        VStack(spacing: 0) {
-                            // 目前資料摘要
-                            SettingRow(
-                                icon: "doc.text.fill",
-                                title: "目前資料",
-                                subtitle: dataSummaryText
-                            ) {
-                                EmptyView()
-                            }
-                            
-                            CustomDivider(colorScheme: colorScheme)
-                            
-                            // 備份按鈕
-                            Button {
-                                Task { await performBackup() }
-                            } label: {
-                                SettingRow(
-                                    icon: "icloud.and.arrow.up.fill",
-                                    title: backupService.isUploading
-                                        ? backupService.uploadProgress
-                                        : "備份到 iCloud",
-                                    subtitle: "將所有資料上傳至您的 iCloud",
-                                    titleColor: AviationTheme.Colors.cathayJade
-                                ) {
-                                    if backupService.isUploading {
-                                        SwiftUI.ProgressView()
-                                            .tint(AviationTheme.Colors.cathayJade)
-                                    } else {
-                                        Image(systemName: "arrow.up.circle.fill")
-                                            .foregroundColor(AviationTheme.Colors.cathayJade)
-                                            .font(.title3)
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(backupService.isUploading || backupService.iCloudAvailable != true)
-                        }
-                        .background(AviationTheme.Colors.cardBackground(colorScheme))
-                        .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
-                        .shadow(color: AviationTheme.Shadows.cardShadow(colorScheme).opacity(0.5), radius: 8, x: 0, y: 2)
+                        .padding(.horizontal, 4)
                     }
                     .padding(.horizontal, AviationTheme.Spacing.md)
                     
@@ -233,7 +231,7 @@ struct CloudBackupView: View {
     
     private var lastBackupDateText: String {
         guard let date = lastBackupDate else { return "尚未備份" }
-        return date.formatted(.dateTime.year().month().day().hour().minute())
+        return Self.dateFormatter.string(from: date)
     }
     
     private var iCloudStatusColor: Color {
@@ -283,6 +281,12 @@ struct CloudBackupView: View {
 
 // MARK: - 備份紀錄列表行
 private struct BackupRecordRow: View {
+    static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy/MM/dd HH:mm"
+        return f
+    }()
+    
     @Environment(\.colorScheme) var colorScheme
     let record: CloudBackupService.BackupRecord
     let isRestoring: Bool
@@ -290,53 +294,85 @@ private struct BackupRecordRow: View {
     let onDelete: () -> Void
     
     var body: some View {
-        HStack(spacing: 16) {
-            // 圖標
-            Image(systemName: "doc.zipper")
-                .font(.title3)
-                .foregroundColor(AviationTheme.Colors.cathayJade)
-                .frame(width: 28)
-            
+        VStack(spacing: 0) {
             // 備份資訊
-            VStack(alignment: .leading, spacing: 4) {
-                Text(record.backupDate.formatted(.dateTime.year().month().day().hour().minute()))
-                    .font(AviationTheme.Typography.body)
-                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+            HStack(spacing: 12) {
+                Image(systemName: "doc.zipper")
+                    .font(.title3)
+                    .foregroundColor(AviationTheme.Colors.cathayJade)
+                    .frame(width: 28)
                 
-                Text("\(record.deviceName)")
-                    .font(AviationTheme.Typography.caption)
-                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(BackupRecordRow.dateFormatter.string(from: record.backupDate))
+                        .font(AviationTheme.Typography.body)
+                        .fontWeight(.medium)
+                        .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                    
+                    Text(record.deviceName)
+                        .font(AviationTheme.Typography.caption)
+                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    
+                    Text(record.recordCounts)
+                        .font(AviationTheme.Typography.caption)
+                        .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 
-                Text(record.recordCounts)
-                    .font(AviationTheme.Typography.caption)
-                    .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                Spacer()
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 12)
             
-            Spacer()
-            
+            // 操作按鈕列
             if isRestoring {
-                SwiftUI.ProgressView()
-                    .tint(AviationTheme.Colors.cathayJade)
+                HStack {
+                    Spacer()
+                    SwiftUI.ProgressView("還原中...")
+                        .tint(AviationTheme.Colors.cathayJade)
+                    Spacer()
+                }
+                .padding(.bottom, 14)
             } else {
-                // 還原按鈕
-                Button(action: onRestore) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.title3)
+                HStack(spacing: 10) {
+                    // 還原按鈕
+                    Button(action: onRestore) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.down.circle")
+                                .font(.subheadline)
+                            Text("還原")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
                         .foregroundColor(AviationTheme.Colors.cathayJade)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(AviationTheme.Colors.cathayJade.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    
+                    // 刪除按鈕
+                    Button(action: onDelete) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "trash")
+                                .font(.subheadline)
+                            Text("刪除")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.red)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.red.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-                
-                // 刪除按鈕
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.subheadline)
-                        .foregroundColor(.red.opacity(0.7))
-                }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
         .contentShape(Rectangle())
     }
 }
