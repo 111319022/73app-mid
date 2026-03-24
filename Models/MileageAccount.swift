@@ -3,11 +3,11 @@ import SwiftData
 
 @Model
 final class MileageAccount {
-    var totalMiles: Int
-    var lastActivityDate: Date
+    var totalMiles: Int = 0
+    var lastActivityDate: Date = Date()
     
-    @Relationship(deleteRule: .cascade) var transactions: [Transaction] = []
-    @Relationship(deleteRule: .cascade) var flightGoals: [FlightGoal] = []
+    @Relationship(deleteRule: .cascade, inverse: \Transaction.account) var transactions: [Transaction]? = []
+    @Relationship(deleteRule: .cascade, inverse: \FlightGoal.account) var flightGoals: [FlightGoal]? = []
     
     init(totalMiles: Int = 0, lastActivityDate: Date = Date()) {
         self.totalMiles = totalMiles
@@ -22,7 +22,7 @@ final class MileageAccount {
     
     // 計算最近有記錄的月份(從交易記錄中取得)
     func latestTransactionMonth() -> Date? {
-        guard let latestTransaction = transactions.max(by: { $0.date < $1.date }) else {
+        guard let latestTransaction = (transactions ?? []).max(by: { $0.date < $1.date }) else {
             return nil
         }
         let calendar = Calendar.current

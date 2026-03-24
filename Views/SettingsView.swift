@@ -17,6 +17,8 @@ struct SettingsView: View {
     @State private var devPasswordInput = ""
     @AppStorage("developerPassword") private var developerPassword: String = "7373"
     @AppStorage("lastBackupDate") private var lastBackupDateTimestamp: Double = 0
+    @AppStorage("cloudKitSyncEnabled") private var cloudKitSyncEnabled: Bool = true
+    @State private var showingSyncRestartAlert = false
     
     private var lastBackupText: String {
         if lastBackupDateTimestamp > 0 {
@@ -161,11 +163,23 @@ struct SettingsView: View {
                         }
                         .padding(.horizontal, AviationTheme.Spacing.md)
                         
-                        // MARK: - 備份
+                        // MARK: - 備份與同步
                         VStack(alignment: .leading, spacing: 8) {
-                            SectionHeaderView(title: "備份", colorScheme: colorScheme)
+                            SectionHeaderView(title: "備份與同步", colorScheme: colorScheme)
                             
                             VStack(spacing: 0) {
+                                SettingToggleRow(
+                                    icon: "arrow.triangle.2.circlepath",
+                                    title: "iCloud 同步",
+                                    subtitle: "在相同 Apple ID 的裝置間自動同步資料",
+                                    isOn: $cloudKitSyncEnabled
+                                )
+                                .onChange(of: cloudKitSyncEnabled) {
+                                    showingSyncRestartAlert = true
+                                }
+                                
+                                CustomDivider(colorScheme: colorScheme)
+                                
                                 NavigationLink(destination: CloudBackupView(viewModel: viewModel)) {
                                     SettingRow(
                                         icon: "icloud.and.arrow.up.fill",
@@ -276,6 +290,11 @@ struct SettingsView: View {
                 Button("取消", role: .cancel) { }
             } message: {
                 Text("請輸入密碼以啟用開發者模式")
+            }
+            .alert("需要重新啟動", isPresented: $showingSyncRestartAlert) {
+                Button("我知道了", role: .cancel) { }
+            } message: {
+                Text("iCloud 同步設定變更將在下次啟動 App 後生效。")
             }
         }
     }

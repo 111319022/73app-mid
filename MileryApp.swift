@@ -3,7 +3,9 @@ import SwiftData
 
 @main
 struct MileryApp: App {
-    var sharedModelContainer: ModelContainer = {
+    let sharedModelContainer: ModelContainer
+    
+    init() {
         let schema = Schema([
             MileageAccount.self,
             Transaction.self,
@@ -12,60 +14,57 @@ struct MileryApp: App {
             RedeemedTicket.self
         ])
         
-        // cloudKitDatabase: .none 避免 SwiftData 自動同步 CloudKit（備份由 CloudBackupService 手動管理）
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .none)
+        let syncEnabled = UserDefaults.standard.object(forKey: "cloudKitSyncEnabled") as? Bool ?? true
         
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            // 如果遷移失敗，先備份舊資料庫再嘗試重建
-            print("無法載入資料庫: \(error)")
-            
-            let url = modelConfiguration.url
-            let fileManager = FileManager.default
-            let dbExtensions = ["", ".store-shm", ".store-wal"]
-            
-            // 將舊資料庫備份到 Documents/DatabaseBackup/
-            let backupDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
-                .appendingPathComponent("DatabaseBackup")
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyyMMdd_HHmmss"
-            let timestamp = formatter.string(from: Date())
-            let backupSubDir = backupDir.appendingPathComponent(timestamp)
-            
-            do {
-                try fileManager.createDirectory(at: backupSubDir, withIntermediateDirectories: true)
-                for ext in dbExtensions {
-                    let sourceURL = ext.isEmpty ? url : url.deletingPathExtension().appendingPathExtension(String(ext.dropFirst()))
-                    if fileManager.fileExists(atPath: sourceURL.path) {
-                        let destURL = backupSubDir.appendingPathComponent(sourceURL.lastPathComponent)
-                        try fileManager.copyItem(at: sourceURL, to: destURL)
-                    }
-                }
-                print("資料庫已備份至: \(backupSubDir.path)")
-            } catch {
-                print("備份資料庫失敗: \(error)")
-            }
-            
-            // 刪除舊資料庫
-            for ext in dbExtensions {
-                let fileURL = ext.isEmpty ? url : url.deletingPathExtension().appendingPathExtension(String(ext.dropFirst()))
-                try? fileManager.removeItem(at: fileURL)
-            }
-            
-            // 重新建立容器
-            do {
-                return try ModelContainer(for: schema, configurations: [modelConfiguration])
-            } catch {
-                fatalError("無法建立資料庫: \(error)")
-            }
+        if syncEnabled, let container = Self.makeCloudKitContainer(schema: schema) {
+            sharedModelContainer = container
+            print("[Milery] CloudKit 同步已啟用")
+        } else if let container = Self.makeLocalContainer(schema: schema) {
+            sharedModelContainer = container
+            print("[Milery] 本地模式（CloudKit 同步已關閉或不可用）")
+        } else {
+            fatalError("[Milery] 無法建立任何資料庫")
         }
-    }()
+    }
     
     var body: some Scene {
         WindowGroup {
             MainTabView()
         }
         .modelContainer(sharedModelContainer)
+    }
+    
+    // MARK: - CloudKit 同步容器
+    
+    private static func makeCloudKitContainer(schema: Schema) -> ModelContainer? {
+        let config = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .automatic
+        )
+        
+        do {
+            return try ModelContainer(for: schema, configurations: [config])
+        } catch {
+            print("[Milery] CloudKit ModelContainer 建立失敗: \(error)")
+            return nil
+        }
+    }
+    
+    // MARK: - 純本地容器（fallback）
+    
+    private static func makeLocalContainer(schema: Schema) -> ModelContainer? {
+        let config = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .none
+        )
+        
+        do {
+            return try ModelContainer(for: schema, configurations: [config])
+        } catch {
+            print("[Milery] Local ModelContainer 建立失敗: \(error)")
+            return nil
+        }
     }
 }

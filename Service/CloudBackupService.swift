@@ -452,7 +452,8 @@ class CloudBackupService {
             transaction.id = t.id // 保留原始 UUID
             transaction.costPerMile = t.costPerMile
             modelContext.insert(transaction)
-            newAccount.transactions.append(transaction)
+            if newAccount.transactions == nil { newAccount.transactions = [] }
+            newAccount.transactions?.append(transaction)
         }
         
         // 6. 重建 FlightGoals
@@ -472,7 +473,8 @@ class CloudBackupService {
             goal.createdDate = g.createdDate
             goal.sortOrder = g.sortOrder
             modelContext.insert(goal)
-            newAccount.flightGoals.append(goal)
+            if newAccount.flightGoals == nil { newAccount.flightGoals = [] }
+            newAccount.flightGoals?.append(goal)
         }
         
         // 7. 重建 CreditCardRules

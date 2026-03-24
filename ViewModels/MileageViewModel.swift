@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import CoreData
 
 @Observable
 class MileageViewModel {
@@ -17,6 +18,11 @@ class MileageViewModel {
     // 儲存錯誤訊息，供 UI 顯示 Alert
     var saveError: String?
     var showSaveError: Bool = false
+    
+    // MARK: - CloudKit 遠端同步狀態
+    var hasRemoteChanges: Bool = false
+    private var knownTransactionCount: Int = 0
+    private var knownGoalCount: Int = 0
     
     init() {}
     
@@ -35,6 +41,51 @@ class MileageViewModel {
     func initialize(context: ModelContext) {
         self.modelContext = context
         loadData()
+        
+        // 記錄初始資料量，用於比對遠端變更
+        knownTransactionCount = transactions.count
+        knownGoalCount = flightGoals.count
+        
+        // 監聽 CloudKit 遠端變更通知
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.NSPersistentStoreRemoteChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleRemoteChange()
+        }
+    }
+    
+    /// 收到遠端變更通知時，檢查是否有新資料
+    private func handleRemoteChange() {
+        guard let context = modelContext else { return }
+        
+        let newTransactionCount = (try? context.fetchCount(FetchDescriptor<Transaction>())) ?? 0
+        let newGoalCount = (try? context.fetchCount(FetchDescriptor<FlightGoal>())) ?? 0
+        
+        if newTransactionCount != knownTransactionCount || newGoalCount != knownGoalCount {
+            hasRemoteChanges = true
+        }
+    }
+    
+    /// 用戶確認同步後，刷新 UI
+    func acknowledgeRemoteChanges() {
+        loadData()
+        knownTransactionCount = transactions.count
+        knownGoalCount = flightGoals.count
+        hasRemoteChanges = false
+    }
+    
+    /// App 回到前台時呼叫，檢查是否有待同步的遠端資料
+    func checkForRemoteChanges() {
+        guard let context = modelContext else { return }
+        
+        let currentTransactionCount = (try? context.fetchCount(FetchDescriptor<Transaction>())) ?? 0
+        let currentGoalCount = (try? context.fetchCount(FetchDescriptor<FlightGoal>())) ?? 0
+        
+        if currentTransactionCount != knownTransactionCount || currentGoalCount != knownGoalCount {
+            hasRemoteChanges = true
+        }
     }
     
     // 載入資料
@@ -45,8 +96,8 @@ class MileageViewModel {
         let accountDescriptor = FetchDescriptor<MileageAccount>()
         if let accounts = try? context.fetch(accountDescriptor), let account = accounts.first {
             self.mileageAccount = account
-            self.transactions = account.transactions.sorted { $0.date > $1.date }
-            self.flightGoals = account.flightGoals
+            self.transactions = (account.transactions ?? []).sorted { $0.date > $1.date }
+            self.flightGoals = account.flightGoals ?? []
         } else {
             // 創建新帳戶
             let newAccount = MileageAccount()
@@ -107,7 +158,8 @@ class MileageViewModel {
         )
         
         context.insert(transaction)
-        account.transactions.append(transaction)
+        if account.transactions == nil { account.transactions = [] }
+        account.transactions?.append(transaction)
         account.updateMiles(amount: earnedMiles, date: date)
         
         saveContext()
@@ -144,7 +196,8 @@ class MileageViewModel {
         goal.sortOrder = maxOrder + 1
         
         context.insert(goal)
-        account.flightGoals.append(goal)
+        if account.flightGoals == nil { account.flightGoals = [] }
+        account.flightGoals?.append(goal)
         
         saveContext()
         loadData()
@@ -203,7 +256,8 @@ class MileageViewModel {
             linkedTicketID: ticket.id
         )
         context.insert(transaction)
-        account.transactions.append(transaction)
+        if account.transactions == nil { account.transactions = [] }
+        account.transactions?.append(transaction)
         account.updateMiles(amount: -goal.requiredMiles, date: redeemedDate)
 
         // 雙向連結
@@ -269,8 +323,8 @@ class MileageViewModel {
         account.updateMiles(amount: -transaction.earnedMiles, date: transaction.date)
         
         // 從陣列中移除
-        if let index = account.transactions.firstIndex(where: { $0.id == transaction.id }) {
-            account.transactions.remove(at: index)
+        if let index = account.transactions?.firstIndex(where: { $0.id == transaction.id }) {
+            account.transactions?.remove(at: index)
         }
         
         // 從資料庫刪除
@@ -300,8 +354,8 @@ class MileageViewModel {
 
         if let transaction = linkedTransaction {
             account.updateMiles(amount: -transaction.earnedMiles, date: transaction.date)
-            if let index = account.transactions.firstIndex(where: { $0.id == transaction.id }) {
-                account.transactions.remove(at: index)
+            if let index = account.transactions?.firstIndex(where: { $0.id == transaction.id }) {
+                account.transactions?.remove(at: index)
             }
             context.delete(transaction)
         }

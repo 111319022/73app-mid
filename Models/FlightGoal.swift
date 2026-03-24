@@ -3,18 +3,20 @@ import SwiftData
 
 @Model
 final class FlightGoal {
-    var id: UUID
-    var origin: String // 出發地 IATA 代碼
-    var destination: String // 目的地 IATA 代碼
-    var originName: String // 出發地中文名稱
-    var destinationName: String // 目的地中文名稱
-    var cabinClass: CabinClass
-    var requiredMiles: Int
-    var isOneworld: Bool // 是否為寰宇一家夥伴航空
-    var isPriority: Bool // 是否為優先目標
-    var isRoundTrip: Bool // 是否為來回程
-    var createdDate: Date
-    var sortOrder: Int // 排序順序（越小越前面，釘選與非釘選分開排序）
+    var id: UUID = UUID()
+    var origin: String = "" // 出發地 IATA 代碼
+    var destination: String = "" // 目的地 IATA 代碼
+    var originName: String = "" // 出發地中文名稱
+    var destinationName: String = "" // 目的地中文名稱
+    var cabinClass: CabinClass = CabinClass.economy
+    var requiredMiles: Int = 0
+    var isOneworld: Bool = false // 是否為寰宇一家夥伴航空
+    var isPriority: Bool = false // 是否為優先目標
+    var isRoundTrip: Bool = false // 是否為來回程
+    var createdDate: Date = Date()
+    var sortOrder: Int = 0 // 排序順序（越小越前面，釘選與非釘選分開排序）
+    
+    var account: MileageAccount? // CloudKit 要求 relationship 必須為 optional
     
     init(origin: String,
          destination: String,

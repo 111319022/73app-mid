@@ -3,14 +3,14 @@ import SwiftData
 
 @Model
 final class Transaction {
-    var id: UUID
-    var date: Date
-    var amount: Decimal // 消費金額或成本
-    var earnedMiles: Int
-    var source: MileageSource
+    var id: UUID = UUID()
+    var date: Date = Date()
+    var amount: Decimal = 0 // 消費金額或成本
+    var earnedMiles: Int = 0
+    var source: MileageSource = MileageSource.cardGeneral
     var acceleratorCategory: AcceleratorCategory? // 加速器類別（如果適用）
-    var notes: String
-    var costPerMile: Double // 每哩成本（自動計算）
+    var notes: String = ""
+    var costPerMile: Double = 0 // 每哩成本（自動計算）
     
     // 額外資訊欄位
     var flightRoute: String? // 飛行累積：航線（例如：TPE-NRT）
@@ -18,6 +18,8 @@ final class Transaction {
     var merchantName: String? // 特店消費累積：商家名稱（例如：星巴克、誠品書店）
     var promotionName: String? // 活動贈送：活動名稱（例如：開卡禮、生日禮）
     var linkedTicketID: UUID? // 兌換機票時連結的 RedeemedTicket ID
+    
+    var account: MileageAccount? // CloudKit 要求 relationship 必須為 optional
     
     init(date: Date = Date(), 
          amount: Decimal, 

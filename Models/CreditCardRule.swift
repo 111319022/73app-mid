@@ -30,35 +30,35 @@ enum CardBrand: String, Codable, CaseIterable {
 
 @Model
 final class CreditCardRule {
-    var id: UUID
-    var cardName: String
-    var bankName: String
-    var isActive: Bool
+    var id: UUID = UUID()
+    var cardName: String = ""
+    var bankName: String = ""
+    var isActive: Bool = true
     
-    // 卡片品牌與等級（SwiftData additive migration，預設值）
+    // 卡片品牌與等級
     var cardBrandRaw: String = "cathayUnitedBank"
     var cardTierRaw: String = ""
     
     // 基礎回饋率 (多少元 = 1 哩)
-    var baseRate: Decimal // 例如：30 表示 30元/哩
+    var baseRate: Decimal = 30 // 例如：30 表示 30元/哩
     
     // 加速器回饋率（哩程加速器消費適用）
-    var acceleratorRate: Decimal // 例如：10 表示 10元/哩
+    var acceleratorRate: Decimal = 30 // 例如：10 表示 10元/哩
     
     // 特約商店回饋率
-    var specialMerchantRate: Decimal // 例如：10 表示 10元/哩
+    var specialMerchantRate: Decimal = 30 // 例如：10 表示 10元/哩
     
     // 生日當月加碼倍數
-    var birthdayMultiplier: Decimal // 例如：2.0 表示雙倍
+    var birthdayMultiplier: Decimal = 1.0 // 例如：2.0 表示雙倍
     
     // 進位方式
-    var roundingMode: RoundingMode
+    var roundingMode: RoundingMode = RoundingMode.down
     
     // 每月結帳日
-    var billingDay: Int
+    var billingDay: Int = 1
     
     // 年費
-    var annualFee: Int
+    var annualFee: Int = 0
     
     // Computed: 卡片品牌
     var cardBrand: CardBrand {

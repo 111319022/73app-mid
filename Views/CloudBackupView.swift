@@ -9,6 +9,7 @@ struct CloudBackupView: View {
     
     @State private var backupService = CloudBackupService()
     @AppStorage("lastBackupDate") private var lastBackupDateTimestamp: Double = 0
+    @AppStorage("cloudKitSyncEnabled") private var cloudKitSyncEnabled: Bool = true
     
     @State private var showingRestoreConfirmation = false
     @State private var selectedBackupID: CKRecord.ID?
@@ -34,6 +35,35 @@ struct CloudBackupView: View {
             
             ScrollView {
                 VStack(spacing: AviationTheme.Spacing.xl) {
+                    
+                    // MARK: - 同步狀態
+                    VStack(alignment: .leading, spacing: 8) {
+                        SectionHeaderView(title: "同步狀態", colorScheme: colorScheme)
+                        
+                        HStack(spacing: 14) {
+                            Image(systemName: cloudKitSyncEnabled ? "arrow.triangle.2.circlepath.circle.fill" : "xmark.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(cloudKitSyncEnabled ? AviationTheme.Colors.cathayJade : AviationTheme.Colors.secondaryText(colorScheme))
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(cloudKitSyncEnabled ? "iCloud 同步已啟用" : "iCloud 同步已關閉")
+                                    .font(AviationTheme.Typography.body)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                                Text(cloudKitSyncEnabled ? "資料會在相同 Apple ID 的裝置間自動同步" : "可在設定中重新開啟同步功能")
+                                    .font(AviationTheme.Typography.caption)
+                                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(AviationTheme.Colors.cardBackground(colorScheme))
+                        .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
+                        .shadow(color: AviationTheme.Shadows.cardShadow(colorScheme).opacity(0.5), radius: 8, x: 0, y: 2)
+                    }
+                    .padding(.horizontal, AviationTheme.Spacing.md)
                     
                     // MARK: - 建立備份（主要行動區）
                     VStack(spacing: 16) {
@@ -171,7 +201,7 @@ struct CloudBackupView: View {
                 .padding(.bottom, AviationTheme.Spacing.xxl)
             }
         }
-        .navigationTitle("iCloud 備份")
+        .navigationTitle("備份與同步")
         .navigationBarTitleDisplayMode(.large)
         .task {
             await backupService.checkiCloudStatus()

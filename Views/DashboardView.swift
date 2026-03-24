@@ -16,6 +16,16 @@ struct DashboardView: View {
                 
                 ScrollView {
                     VStack(spacing: AviationTheme.Spacing.lg) {
+                        // 同步提示 Banner
+                        if viewModel.hasRemoteChanges {
+                            SyncBannerView {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    viewModel.acknowledgeRemoteChanges()
+                                }
+                            }
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+                        
                         // 英雄卡片 - 總哩程與到期資訊
                         if let account = viewModel.mileageAccount {
                             HeroMilesCard(
@@ -70,6 +80,9 @@ struct DashboardView: View {
             .navigationTitle("儀表板")
             .navigationBarTitleDisplayMode(.large)
             .toolbarBackgroundVisibility(.automatic, for: .navigationBar)
+            .onAppear {
+                viewModel.checkForRemoteChanges()
+            }
         }
     }
 }
@@ -695,6 +708,55 @@ struct ExpiryAlertCard: View {
             RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
                 .stroke(alertColor.opacity(0.3), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - 同步提示 Banner
+struct SyncBannerView: View {
+    @Environment(\.colorScheme) var colorScheme
+    var onSync: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.title3)
+                .foregroundColor(AviationTheme.Colors.cathayJade)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("收到來自其他裝置的更新")
+                    .font(AviationTheme.Typography.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                Text("點選同步以更新儀表板資料")
+                    .font(AviationTheme.Typography.caption)
+                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+            }
+            
+            Spacer()
+            
+            Button(action: onSync) {
+                Text("同步")
+                    .font(AviationTheme.Typography.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(AviationTheme.Colors.cathayJade)
+                    )
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg)
+                .fill(AviationTheme.Colors.cardBackground(colorScheme))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg)
+                .stroke(AviationTheme.Colors.cathayJade.opacity(0.3), lineWidth: 1)
+        )
+        .shadow(color: AviationTheme.Shadows.cardShadow(colorScheme).opacity(0.5), radius: 8, x: 0, y: 2)
     }
 }
 

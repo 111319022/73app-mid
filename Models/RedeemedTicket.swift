@@ -3,20 +3,20 @@ import SwiftData
 
 @Model
 final class RedeemedTicket {
-    var id: UUID
-    var originIATA: String
-    var destinationIATA: String
-    var originName: String
-    var destinationName: String
-    var isRoundTrip: Bool
-    var cabinClass: CabinClass
-    var spentMiles: Int
-    var taxPaid: Decimal
-    var flightDate: Date
-    var pnr: String
-    var airline: String
-    var flightNumber: String
-    var redeemedDate: Date
+    var id: UUID = UUID()
+    var originIATA: String = ""
+    var destinationIATA: String = ""
+    var originName: String = ""
+    var destinationName: String = ""
+    var isRoundTrip: Bool = false
+    var cabinClass: CabinClass = CabinClass.economy
+    var spentMiles: Int = 0
+    var taxPaid: Decimal = 0
+    var flightDate: Date = Date()
+    var pnr: String = ""
+    var airline: String = ""
+    var flightNumber: String = ""
+    var redeemedDate: Date = Date()
     var linkedTransactionID: UUID?
 
     init(
