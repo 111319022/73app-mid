@@ -261,6 +261,22 @@ struct SettingsView: View {
                                         }
                                     }
                                     .buttonStyle(.plain)
+
+                                    CustomDivider(colorScheme: colorScheme)
+
+                                    NavigationLink(destination: ConsoleLogView()) {
+                                        SettingRow(
+                                            icon: "terminal.fill",
+                                            title: "Console 日誌",
+                                            subtitle: "檢視 App 內部同步與備份紀錄"
+                                        ) {
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                                                .font(.subheadline)
+                                                .fontWeight(.semibold)
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                                 .background(AviationTheme.Colors.cardBackground(colorScheme))
                                 .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
