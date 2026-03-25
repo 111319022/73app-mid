@@ -172,14 +172,14 @@ private struct LogEntryRow: View {
     let time: String
     let message: String
     
-    /// 根據訊息標籤決定顏色
-    private var tagColor: Color {
+    /// 根據訊息標籤決定時間戳顏色（用於快速辨識類別）
+    private var timeColor: Color {
+        if message.contains("失敗") || message.contains("error") || message.contains("Error") { return .red }
         if message.contains("[Sync") { return .blue }
         if message.contains("[CloudBackup]") { return .purple }
         if message.contains("[SyncDiag]") { return .cyan }
         if message.contains("[DevAccess]") { return .orange }
         if message.contains("[Milery]") { return .green }
-        if message.contains("失敗") || message.contains("error") || message.contains("Error") { return .red }
         return .secondary
     }
     
@@ -187,12 +187,12 @@ private struct LogEntryRow: View {
         HStack(alignment: .top, spacing: 8) {
             Text(time)
                 .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(timeColor)
                 .frame(width: 62, alignment: .leading)
             
             Text(message)
                 .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(tagColor)
+                .foregroundStyle(.primary)
                 .textSelection(.enabled)
                 .lineLimit(nil)
         }
