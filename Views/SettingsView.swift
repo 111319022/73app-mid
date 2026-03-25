@@ -19,6 +19,8 @@ struct SettingsView: View {
     @AppStorage("lastBackupDate") private var lastBackupDateTimestamp: Double = 0
     @AppStorage("cloudKitSyncEnabled") private var cloudKitSyncEnabled: Bool = true
     @State private var showingSyncRestartAlert = false
+    @State private var toastMessage: String?
+    @State private var showToast = false
     
     private var lastBackupText: String {
         if lastBackupDateTimestamp > 0 {
@@ -329,6 +331,13 @@ struct SettingsView: View {
             } message: {
                 Text("iCloud 同步設定變更將在下次啟動 App 後生效。")
             }
+            .overlay(alignment: .bottom) {
+                if showToast, let message = toastMessage {
+                    DevToastView(message: message)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .padding(.bottom, 32)
+                }
+            }
         }
     }
     
@@ -341,6 +350,7 @@ struct SettingsView: View {
             if versionTapCount >= 10 {
                 isDeveloperModeEnabled = false
                 versionTapCount = 0
+                showDevToast("開發者模式已關閉")
             }
         } else {
             // 未啟用開發者模式，點 10 次做 CloudKit 白名單驗證
@@ -362,11 +372,24 @@ struct SettingsView: View {
             switch result {
             case .allowed:
                 isDeveloperModeEnabled = true
+                showDevToast("開發者模式已啟用")
                 appLog("[DevAccess] CloudKit 白名單驗證通過")
             case .denied(let message):
                 developerAccessMessage = message
                 showingDeveloperAccessAlert = true
                 appLog("[DevAccess] CloudKit 白名單驗證失敗：\(message)")
+            }
+        }
+    }
+    
+    private func showDevToast(_ message: String) {
+        toastMessage = message
+        withAnimation(.spring(duration: 0.35)) {
+            showToast = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                showToast = false
             }
         }
     }
@@ -522,6 +545,31 @@ struct SettingsAirportPickerWrapper: View {
         }
         .navigationTitle("選擇常用出發地")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - 開發者模式開關Toast提示
+struct DevToastView: View {
+    let message: String
+    @Environment(\.colorScheme) var colorScheme
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: message.contains("啟用") ? "hammer.fill" : "hammer")
+                .font(.subheadline)
+                .foregroundColor(.white)
+            Text(message)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(
+            Capsule()
+                .fill(Color.black.opacity(colorScheme == .dark ? 0.85 : 0.75))
+                .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 4)
+        )
     }
 }
 
