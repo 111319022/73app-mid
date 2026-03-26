@@ -106,8 +106,8 @@ struct MilestonesView: View {
         goalRoutes + redeemableRoutes
     }
 
-    /// 是否有內容顯示在地圖上
-    private var hasMapContent: Bool {
+    /// 0航線內容顯示在地圖上
+    private var hasRouteContent: Bool {
         !routes.isEmpty || !allGoalRoutes.isEmpty
     }
 
@@ -180,15 +180,7 @@ struct MilestonesView: View {
 
         ZStack {
 
-            if hasMapContent {
-
-                mapContent
-
-            } else {
-
-                emptyStateView
-
-            }
+            mapContent
 
         }
 
@@ -494,7 +486,7 @@ struct MilestonesView: View {
                     )
 
                 }
-            } else {
+            } else if hasRouteContent {
                 HStack(spacing: 32) {
                     StatColumn(value: "\(allGoalRoutes.count)", label: "目標")
                     let currentMiles = viewModel.mileageAccount?.totalMiles ?? 0
@@ -548,7 +540,7 @@ struct MilestonesView: View {
                             .stroke(Color.white.opacity(0.15), lineWidth: 1)
                     )
                 }
-            } else if !allGoalRoutes.isEmpty {
+            } else if hasRouteContent {
                 // 僅有目標航線：顯示目標數量提示
                 HStack(spacing: 10) {
                     Image(systemName: "target")
@@ -559,6 +551,26 @@ struct MilestonesView: View {
                 .foregroundStyle(.white.opacity(0.7))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                        .environment(\.colorScheme, .dark)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+            } else {
+                // 全空狀態：提示使用者新增目標航線
+                VStack(spacing: 8) {
+                    Text("前往「進度」頁面新增目標航線\n你的飛行足跡將在這裡呈現")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(4)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(.ultraThinMaterial)
@@ -579,79 +591,7 @@ struct MilestonesView: View {
 
 
 
-    // MARK: - Empty State
-
-    private var emptyStateView: some View {
-
-        ZStack {
-
-            AviationTheme.Gradients.dashboardBackground(colorScheme)
-
-                .ignoresSafeArea()
-
-
-
-            VStack(spacing: 24) {
-
-                Spacer()
-
-
-
-                ZStack {
-
-                    Circle()
-
-                        .fill(AviationTheme.Colors.cathayJade.opacity(0.08))
-
-                        .frame(width: 120, height: 120)
-
-
-
-                    Image(systemName: "globe.asia.australia")
-
-                        .font(.system(size: 52, weight: .thin))
-
-                        .foregroundStyle(AviationTheme.Colors.cathayJade.opacity(0.5))
-
-                }
-
-
-
-                VStack(spacing: 8) {
-
-                    Text("尚無里程碑")
-
-                        .font(AviationTheme.Typography.title2)
-
-                        .foregroundStyle(AviationTheme.Colors.primaryText(colorScheme))
-
-
-
-                    Text("完成目標並兌換機票後\n你的航線成就將在這裡呈現")
-
-                        .font(AviationTheme.Typography.subheadline)
-
-                        .foregroundStyle(AviationTheme.Colors.tertiaryText(colorScheme))
-
-                        .multilineTextAlignment(.center)
-
-                        .lineSpacing(4)
-
-                }
-
-
-
-                Spacer()
-
-                Spacer()
-
-            }
-
-            .padding(.horizontal, 40)
-
-        }
-
-    }
+    
 
 
 
@@ -747,7 +687,16 @@ struct MilestonesView: View {
         let redeemedCoords = routes.flatMap { [$0.origin, $0.destination] }
         let goalCoords = showGoals ? allGoalRoutes.flatMap { [$0.origin, $0.destination] } : []
         let allCoords = redeemedCoords + goalCoords
-        guard !allCoords.isEmpty else { return }
+        guard !allCoords.isEmpty else {
+            // 空狀態：預設顯示亞洲區域的地球視角
+            withAnimation(.easeInOut(duration: 1.2)) {
+                mapPosition = .region(MKCoordinateRegion(
+                    center: CLLocationCoordinate2D(latitude: 25.0, longitude: 121.5),
+                    span: MKCoordinateSpan(latitudeDelta: 80, longitudeDelta: 80)
+                ))
+            }
+            return
+        }
 
         let lats = allCoords.map(\.latitude)
 
