@@ -188,6 +188,9 @@ struct HeroMilesCard: View {
     
     @State private var displayedMiles: Int = 0
     
+    // 追蹤此次 app session 是否已播放過動畫
+    private static var hasPlayedAnimation = false
+    
     var expiryColor: Color {
         if daysUntilExpiry < 30 {
             return AviationTheme.Colors.danger
@@ -253,7 +256,12 @@ struct HeroMilesCard: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("可用哩程 \(totalMiles) 哩")
                 .onAppear {
-                    startCountAnimation(to: totalMiles)
+                    if !HeroMilesCard.hasPlayedAnimation {
+                        startCountAnimation(to: totalMiles)
+                        HeroMilesCard.hasPlayedAnimation = true
+                    } else {
+                        displayedMiles = totalMiles
+                    }
                 }
                 .onChange(of: totalMiles) {
                     startCountAnimation(to: totalMiles)
