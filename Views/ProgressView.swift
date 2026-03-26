@@ -255,9 +255,13 @@ struct HalfCircleProgressView: View {
     private let strokeWidth: CGFloat = 14
     private var radius: CGFloat { arcDiameter / 2 }
     
+    @State private var animatedProgress: Double = 0
+    
+    private var targetProgress: Double {
+        min(goal.progress(currentMiles: currentMiles), 1.0)
+    }
+    
     var body: some View {
-        let progressValue = min(goal.progress(currentMiles: currentMiles), 1.0)
-        
         ZStack(alignment: .bottom) {
             // 1. 背景軌道與進度條
             ZStack {
@@ -268,8 +272,7 @@ struct HalfCircleProgressView: View {
                     )
                 
                 HalfCirclePath()
-                    // 避免進度為 0 時不渲染，設定最小為 0.001 讓它出現一個起點圓點
-                    .trim(from: 0, to: max(progressValue, 0.001))
+                    .trim(from: 0, to: max(animatedProgress, 0.001))
                     .stroke(
                         LinearGradient(
                             colors: [
@@ -281,7 +284,6 @@ struct HalfCircleProgressView: View {
                         ),
                         style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round)
                     )
-                    .animation(.easeInOut(duration: 1.0), value: progressValue)
             }
             .frame(width: arcDiameter, height: radius)
             .padding(.horizontal, strokeWidth / 2)
@@ -319,7 +321,7 @@ struct HalfCircleProgressView: View {
                         .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
                 }
                 
-                Text("\(Int(progressValue * 100))%")
+                Text("\(Int(animatedProgress * 100))%")
                     .font(AviationTheme.Typography.caption)
                     .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
                     .padding(.horizontal, 12)
@@ -332,6 +334,17 @@ struct HalfCircleProgressView: View {
             .offset(y: 12)
         }
         .padding(.bottom, 35)
+        .onAppear {
+            animatedProgress = 0
+            withAnimation(.easeOut(duration: 1.0).delay(0.2)) {
+                animatedProgress = targetProgress
+            }
+        }
+        .onChange(of: targetProgress) {
+            withAnimation(.easeOut(duration: 0.6)) {
+                animatedProgress = targetProgress
+            }
+        }
     }
 }
 
@@ -469,6 +482,7 @@ struct GoalProgressCard: View {
     
     @State private var showingDeleteAlert = false
     @State private var showingRedeemSheet = false
+    @State private var animatedProgress: Double = 0
     
     var currentMiles: Int {
         viewModel.mileageAccount?.totalMiles ?? 0
@@ -476,6 +490,10 @@ struct GoalProgressCard: View {
 
     var isRedeemable: Bool {
         goal.progress(currentMiles: currentMiles) >= 1.0
+    }
+    
+    private var targetProgress: Double {
+        min(goal.progress(currentMiles: currentMiles), 1.0)
     }
     
     var body: some View {
@@ -553,7 +571,7 @@ struct GoalProgressCard: View {
                     
                     Spacer()
                     
-                    Text("\(Int(goal.progress(currentMiles: currentMiles) * 100))%")
+                    Text("\(Int(animatedProgress * 100))%")
                         .font(AviationTheme.Typography.caption)
                         .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
                 }
@@ -575,8 +593,7 @@ struct GoalProgressCard: View {
                                     endPoint: .trailing
                                 )
                             )
-                            .frame(width: geometry.size.width * min(goal.progress(currentMiles: currentMiles), 1.0), height: 8)
-                            .animation(.easeInOut(duration: 0.5), value: goal.progress(currentMiles: currentMiles))
+                            .frame(width: geometry.size.width * animatedProgress, height: 8)
                     }
                 }
                 .frame(height: 8)
@@ -623,6 +640,17 @@ struct GoalProgressCard: View {
         .accessibilityLabel("\(goal.originName)到\(goal.destinationName)，\(goal.cabinClass.rawValue)，進度 \(Int(goal.progress(currentMiles: currentMiles) * 100))%，\(currentMiles) / \(goal.requiredMiles) 哩")
         .onTapGesture {
             onEdit?()
+        }
+        .onAppear {
+            animatedProgress = 0
+            withAnimation(.easeOut(duration: 0.7).delay(0.3)) {
+                animatedProgress = targetProgress
+            }
+        }
+        .onChange(of: targetProgress) {
+            withAnimation(.easeOut(duration: 0.5)) {
+                animatedProgress = targetProgress
+            }
         }
         .alert("確定要刪除此目標？", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) {}
