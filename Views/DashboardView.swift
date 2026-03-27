@@ -34,8 +34,7 @@ struct DashboardView: View {
                                 totalMiles: account.totalMiles,
                                 latestActivityMonth: account.latestActivityMonthText(),
                                 expiryDate: account.expiryDate(),
-                                daysUntilExpiry: account.daysUntilExpiry(),
-                                programName: viewModel.activeProgram?.name ?? "Asia Miles"
+                                daysUntilExpiry: account.daysUntilExpiry()
                             )
                         }
                         
@@ -186,7 +185,6 @@ struct HeroMilesCard: View {
     let latestActivityMonth: String
     let expiryDate: Date
     let daysUntilExpiry: Int
-    var programName: String = "Asia Miles"
     
     @State private var displayedMiles: Int = 0
     
@@ -221,7 +219,7 @@ struct HeroMilesCard: View {
                             )
                         
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(programName)
+                            Text("Asia Miles")
                                 .font(AviationTheme.Typography.caption)
                                 .foregroundColor(AviationTheme.Colors.brandColor(colorScheme))
                             Text("可用哩程")
@@ -399,7 +397,7 @@ struct DreamRadarCard: View {
         VStack(alignment: .leading, spacing: AviationTheme.Spacing.md) {
             // 標題列
             HStack {
-                Image(systemName: "scope")
+                Image(systemName: "radar")
                     .font(.body)
                     .foregroundStyle(AviationTheme.Colors.brandColor(colorScheme))
                 Text("夢想雷達")
@@ -528,7 +526,7 @@ struct MonthlyCockpitCard: View {
                 Image(systemName: "gauge.open.with.lines.needle.33percent.and.arrowtriangle")
                     .font(.body)
                     .foregroundStyle(AviationTheme.Colors.brandColor(colorScheme))
-                Text("本月總覽")
+                Text("本月駕駛艙")
                     .font(AviationTheme.Typography.headline)
                     .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
                 Spacer()
