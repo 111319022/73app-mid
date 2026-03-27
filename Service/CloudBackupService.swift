@@ -214,8 +214,28 @@ class CloudBackupService {
         let flightGoals = allGoals.filter { $0.programID == programID }
         let redeemedTickets = allTickets.filter { $0.programID == programID }
         
-        guard let account = accounts.sorted(by: { $0.totalMiles > $1.totalMiles }).first else {
-            throw BackupError.noAccountData
+        appLog("[CloudBackup] 備份資料統計: 全部帳戶=\(allAccounts.count), 符合計劃帳戶=\(accounts.count), programID=\(programID?.uuidString ?? "nil")")
+        appLog("[CloudBackup] 全部帳戶 programID 列表: \(allAccounts.map { $0.programID?.uuidString ?? "nil" })")
+        
+        // 若找不到符合 programID 的帳戶，嘗試自動修正（將 programID 為 nil 的帳戶綁定到當前計劃）
+        var account: MileageAccount
+        if let matched = accounts.sorted(by: { $0.totalMiles > $1.totalMiles }).first {
+            account = matched
+        } else if let programID,
+                  let orphan = allAccounts.filter({ $0.programID == nil }).sorted(by: { $0.totalMiles > $1.totalMiles }).first {
+            // 自動修正：將未綁定計劃的帳戶綁定到當前計劃
+            orphan.programID = programID
+            try? modelContext.save()
+            account = orphan
+            appLog("[CloudBackup] 自動修正: 將未綁定帳戶綁定至計劃 \(programName)")
+        } else {
+            // 仍然找不到，建立一個新帳戶以避免備份失敗
+            let newAccount = MileageAccount()
+            newAccount.programID = programID
+            modelContext.insert(newAccount)
+            try? modelContext.save()
+            account = newAccount
+            appLog("[CloudBackup] 自動建立新帳戶以完成備份")
         }
         
         // 2. 轉換為 Codable 結構

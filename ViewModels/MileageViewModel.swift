@@ -47,6 +47,9 @@ class MileageViewModel {
         )
         programs = (try? context.fetch(descriptor)) ?? []
         
+        // 合併重複的預設計劃（CloudKit 同步可能導致多台裝置各自建立預設計劃）
+        deduplicateDefaultPrograms()
+        
         // 首次使用：若無任何計劃，建立預設的 Asia Miles 計劃
         if programs.isEmpty {
             let defaultProgram = MileageProgram(name: "Asia Miles", programType: .asiaMiles, isDefault: true)
@@ -67,6 +70,94 @@ class MileageViewModel {
             activeProgram = first
             ActiveProgramManager.activeProgramID = first.id
         }
+    }
+    
+    /// 合併重複的預設計劃：CloudKit 同步時，多台裝置可能各自建立了 isDefault=true 的計劃，
+    /// 需要將它們合併為同一個，並將資料的 programID 統一指向保留的計劃。
+    private func deduplicateDefaultPrograms() {
+        guard let context = modelContext else { return }
+        
+        // 找出所有 isDefault == true 的計劃
+        let defaultPrograms = programs.filter { $0.isDefault }
+        guard defaultPrograms.count > 1 else { return }
+        
+        // 保留最早建立的計劃（或擁有最多資料的計劃）
+        let allAccounts = (try? context.fetch(FetchDescriptor<MileageAccount>())) ?? []
+        let allTransactions = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
+        
+        // 選擇擁有最多交易的計劃作為保留對象，若交易數相同則選最早建立的
+        let keepProgram = defaultPrograms.max { a, b in
+            let aCount = allTransactions.filter { $0.programID == a.id }.count
+                       + allAccounts.filter { $0.programID == a.id }.map { $0.totalMiles }.reduce(0, +)
+            let bCount = allTransactions.filter { $0.programID == b.id }.count
+                       + allAccounts.filter { $0.programID == b.id }.map { $0.totalMiles }.reduce(0, +)
+            if aCount != bCount { return aCount < bCount }
+            return a.createdDate > b.createdDate
+        }!
+        
+        let duplicates = defaultPrograms.filter { $0.id != keepProgram.id }
+        guard !duplicates.isEmpty else { return }
+        
+        let duplicateIDs = Set(duplicates.map { $0.id })
+        appLog("[Program] 偵測到 \(defaultPrograms.count) 個重複的預設計劃，合併至: \(keepProgram.id.uuidString.prefix(8))")
+        
+        // 將所有重複計劃的資料遷移到保留的計劃
+        let allGoals = (try? context.fetch(FetchDescriptor<FlightGoal>())) ?? []
+        let allTickets = (try? context.fetch(FetchDescriptor<RedeemedTicket>())) ?? []
+        
+        for account in allAccounts where duplicateIDs.contains(account.programID ?? UUID()) {
+            account.programID = keepProgram.id
+        }
+        for tx in allTransactions where duplicateIDs.contains(tx.programID ?? UUID()) {
+            tx.programID = keepProgram.id
+        }
+        for goal in allGoals where duplicateIDs.contains(goal.programID ?? UUID()) {
+            goal.programID = keepProgram.id
+        }
+        for ticket in allTickets where duplicateIDs.contains(ticket.programID ?? UUID()) {
+            ticket.programID = keepProgram.id
+        }
+        
+        // 合併帳戶：將重複計劃的帳戶哩程合併到保留帳戶
+        let keepAccounts = allAccounts.filter { $0.programID == keepProgram.id }
+        let duplicateAccounts = allAccounts.filter { duplicateIDs.contains($0.programID ?? UUID()) }
+        
+        if let mainAccount = keepAccounts.sorted(by: { $0.totalMiles > $1.totalMiles }).first {
+            // 將重複帳戶的交易/目標關聯轉移到主帳戶
+            for dupAccount in duplicateAccounts {
+                for tx in dupAccount.transactions ?? [] {
+                    if mainAccount.transactions == nil { mainAccount.transactions = [] }
+                    mainAccount.transactions?.append(tx)
+                }
+                for goal in dupAccount.flightGoals ?? [] {
+                    if mainAccount.flightGoals == nil { mainAccount.flightGoals = [] }
+                    mainAccount.flightGoals?.append(goal)
+                }
+                // 更新最後活動日期
+                if dupAccount.lastActivityDate > mainAccount.lastActivityDate {
+                    mainAccount.lastActivityDate = dupAccount.lastActivityDate
+                }
+                context.delete(dupAccount)
+            }
+        }
+        
+        // 刪除重複的計劃
+        for dup in duplicates {
+            context.delete(dup)
+        }
+        
+        try? context.save()
+        
+        // 重新讀取計劃列表
+        let descriptor = FetchDescriptor<MileageProgram>(
+            sortBy: [SortDescriptor(\MileageProgram.createdDate)]
+        )
+        programs = (try? context.fetch(descriptor)) ?? []
+        
+        // 更新 activeProgramID 指向保留的計劃
+        ActiveProgramManager.activeProgramID = keepProgram.id
+        
+        appLog("[Program] 重複計劃合併完成，保留計劃: \(keepProgram.name) (\(keepProgram.id.uuidString.prefix(8)))")
     }
     
     /// 將既有無 programID 的資料綁定到指定計劃
@@ -95,6 +186,43 @@ class MileageViewModel {
         
         try? context.save()
         appLog("[Program] 既有資料已遷移至計劃: \(program.name)")
+    }
+    
+    /// 將 programID 為 nil 或不屬於任何現有計劃的孤兒資料，綁定到當前啟用計劃
+    private func migrateOrphanedDataToActiveProgram() {
+        guard let context = modelContext, let activePID = activeProgram?.id else { return }
+        
+        let validProgramIDs = Set(programs.map { $0.id })
+        var migrated = 0
+        
+        let accounts = (try? context.fetch(FetchDescriptor<MileageAccount>())) ?? []
+        for account in accounts where account.programID == nil || !validProgramIDs.contains(account.programID!) {
+            account.programID = activePID
+            migrated += 1
+        }
+        
+        let transactions = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
+        for tx in transactions where tx.programID == nil || !validProgramIDs.contains(tx.programID!) {
+            tx.programID = activePID
+            migrated += 1
+        }
+        
+        let goals = (try? context.fetch(FetchDescriptor<FlightGoal>())) ?? []
+        for goal in goals where goal.programID == nil || !validProgramIDs.contains(goal.programID!) {
+            goal.programID = activePID
+            migrated += 1
+        }
+        
+        let tickets = (try? context.fetch(FetchDescriptor<RedeemedTicket>())) ?? []
+        for ticket in tickets where ticket.programID == nil || !validProgramIDs.contains(ticket.programID!) {
+            ticket.programID = activePID
+            migrated += 1
+        }
+        
+        if migrated > 0 {
+            try? context.save()
+            appLog("[Sync] 已將 \(migrated) 筆孤兒資料綁定至當前計劃")
+        }
     }
     
     /// 切換啟用的里程計劃
@@ -210,6 +338,13 @@ class MileageViewModel {
         let workItem = DispatchWorkItem { [weak self] in
             guard let self, let context = self.modelContext else { return }
             context.rollback()
+            
+            // 重新載入計劃列表，處理從遠端同步過來的新計劃或重複計劃
+            self.loadPrograms()
+            
+            // 嘗試將未綁定計劃的資料自動綁定到當前計劃
+            self.migrateOrphanedDataToActiveProgram()
+            
             let newFingerprint = self.fetchDataFingerprint()
             guard newFingerprint != self.knownDataFingerprint else { return }
             appLog("[Sync] 偵測到實際資料變更，刷新 UI")
@@ -228,6 +363,8 @@ class MileageViewModel {
     /// 手動同步：重置快取並重新讀取本地 store（含已匯入的 CloudKit 變更）
     func manualSyncNow() {
         modelContext?.rollback()
+        loadPrograms()
+        migrateOrphanedDataToActiveProgram()
         loadData()
         knownDataFingerprint = fetchDataFingerprint()
         hasRemoteChanges = false
@@ -236,6 +373,8 @@ class MileageViewModel {
     /// App 回到前台時呼叫，重置快取後檢查是否有新資料
     func checkForRemoteChanges() {
         modelContext?.rollback()
+        loadPrograms()
+        migrateOrphanedDataToActiveProgram()
         let latestFingerprint = fetchDataFingerprint()
         if latestFingerprint != knownDataFingerprint {
             appLog("[Sync] 偵測到資料指紋變更，自動刷新")
