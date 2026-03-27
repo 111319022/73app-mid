@@ -58,7 +58,6 @@ struct SettingsView: View {
                                 SettingRow(
                                     icon: "paintbrush.fill",
                                     title: "主題",
-                                    subtitle: themeDisplayName
                                 ) {
                                     Menu {
                                         Button(action: { userColorScheme = "system" }) {
