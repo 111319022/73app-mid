@@ -95,22 +95,23 @@ Milery是一款專為航空常客與哩程使用者開發之 iOS 原生應用程
 
 ```text
 設定
-└── 開發者（隱藏，需 CloudKit 白名單驗證）
-    ├── 機場資料列表（AirportListView.swift）
-    │   └── 搜尋 CSV 機場資料、協助完善 AirportDatabase
-    ├── 分頁顯示管理（TabVisibilitySettingsView.swift）
-    │   └── 控制 TabView 顯示哪些分頁
-    ├── 資料管理（DataManagementView.swift）
-    │   ├── SwiftData 全量資料檢視（Account / Transaction / Goal / Ticket / Legacy Card）
-    │   ├── 每筆資料可右滑刪除（清理異常資料）
-    │   ├── 安全清理（重複帳戶、孤兒資料、舊版殘留）
-    │   ├── CloudKit 狀態摘要（同步開關 / iCloud 帳號 / 備份筆數）
-    │   └── CloudKit record 詳細檢視（進階，CloudKitAdvancedView.swift）
-    └── Console 日誌（ConsoleLogView.swift）
-        ├── 全量日誌檢視
-        ├── 只看同步相關（Sync / iCloud / CloudKit）
-        ├── 複製目前清單
-        └── 自動清理 7 天前日誌
+├── 開發者（隱藏，需 CloudKit 白名單驗證）
+│    ├── 機場資料列表（AirportListView.swift）
+│    │   └── 搜尋 CSV 機場資料、協助完善 AirportDatabase
+│    ├── 分頁顯示管理（TabVisibilitySettingsView.swift）
+│    │   └── 控制 TabView 顯示哪些分頁
+│    ├── 資料管理（DataManagementView.swift）
+│    │   ├── SwiftData 全量資料檢視（Account / Transaction / Goal / Ticket / Legacy Card）
+│    │   ├── 每筆資料可右滑刪除（清理異常資料）
+│    │   ├── 安全清理（重複帳戶、孤兒資料、舊版殘留）
+│    │   ├── CloudKit 狀態摘要（同步開關 / iCloud 帳號 / 備份筆數）
+│    │   └── CloudKit record 詳細檢視（進階，CloudKitAdvancedView.swift）
+│    └── Console 日誌（ConsoleLogView.swift）
+│       ├── 全量日誌檢視
+│       ├── 只看同步相關（Sync / iCloud / CloudKit）
+│       ├── 複製目前清單
+│       └── 自動清理 7 天前日誌
+└── 開發中頁面（隱藏，需 CloudKit 白名單驗證）
 ```
 
 ### 開發者模式啟用方式
