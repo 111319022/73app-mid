@@ -19,6 +19,8 @@ struct MilestonesView: View {
 
     @State private var showGoalRoutes = false
 
+    @State private var showAirportLabels = true
+
 
 
     private var routes: [RedeemedRoute] {
@@ -109,6 +111,11 @@ struct MilestonesView: View {
     /// 0航線內容顯示在地圖上
     private var hasRouteContent: Bool {
         !routes.isEmpty || !allGoalRoutes.isEmpty
+    }
+
+    /// 只要有目標航線，就顯示更多設定選單
+    private var hasGoalRouteOptions: Bool {
+        !allGoalRoutes.isEmpty
     }
 
     /// 所有不重複的機場點（每個機場獨立一個 pin）
@@ -287,7 +294,12 @@ struct MilestonesView: View {
                 // 機場標記點
                 ForEach(uniqueAirports) { pin in
                     Annotation("", coordinate: pin.coordinate, anchor: .center) {
-                        AirportAnnotationView(cityNameEN: pin.cityNameEN, iata: pin.iata, isGoal: pin.isGoal)
+                        AirportAnnotationView(
+                            cityNameEN: pin.cityNameEN,
+                            iata: pin.iata,
+                            isGoal: pin.isGoal,
+                            showLabel: showAirportLabels
+                        )
                     }
                 }
 
@@ -382,27 +394,86 @@ struct MilestonesView: View {
                 }
 
                 .overlay(alignment: .topTrailing) {
-                    // 有兌換紀錄且有任何目標時顯示 ⋯ 按鈕
-                    if !routes.isEmpty && !viewModel.flightGoals.isEmpty {
-                        Menu {
+                    if hasRouteContent {
+                        VStack(spacing: 0) {
                             Button {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    showGoalRoutes.toggle()
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showAirportLabels.toggle()
                                 }
                             } label: {
-                                Label(
-                                    showGoalRoutes ? "隱藏目標航線" : "顯示目標航線",
-                                    systemImage: showGoalRoutes ? "eye.slash" : "eye"
-                                )
+                                Image(systemName: showAirportLabels ? "text.bubble.fill" : "text.bubble")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .symbolRenderingMode(.hierarchical)
+                                    .foregroundStyle(.white.opacity(0.98))
+                                    .frame(width: 40, height: 40)
+                                    .contentShape(Circle())
                             }
-                        } label: {
-                            Image(systemName: "ellipsis.circle.fill")
-                                .font(.system(size: 28))
-                                .symbolRenderingMode(.palette)
-                                .foregroundStyle(.white.opacity(0.9), .ultraThinMaterial)
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(showAirportLabels ? "隱藏航點名稱" : "顯示航點名稱")
+
+                            if hasGoalRouteOptions && !routes.isEmpty {
+                                Menu {
+                                    Button {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            showGoalRoutes.toggle()
+                                        }
+                                    } label: {
+                                        Label(
+                                            showGoalRoutes ? "隱藏目標航線" : "顯示目標航線",
+                                            systemImage: showGoalRoutes ? "eye.slash" : "eye"
+                                        )
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis")
+                                        .font(.system(size: 17, weight: .bold))
+                                        .symbolRenderingMode(.hierarchical)
+                                        .foregroundStyle(.white.opacity(0.98))
+                                        .frame(width: 40, height: 40)
+                                        .contentShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("更多選項")
+                            }
                         }
-                        .padding(.top, 62)
-                        .padding(.trailing, 20)
+                        .padding(4)
+                        .frame(width: 48)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(.ultraThinMaterial)
+                                .environment(\.colorScheme, .dark)
+                        )
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.3),
+                                            Color.white.opacity(0.12)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 0.8
+                                )
+                                .allowsHitTesting(false)
+                        )
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.12),
+                                            Color.clear
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .center
+                                    )
+                                )
+                                .allowsHitTesting(false)
+                        )
+                        .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 7)
+                        .padding(.top, 52)
+                        .padding(.trailing, 14)
                     }
                 }
 
@@ -842,39 +913,41 @@ private struct AirportAnnotationView: View {
     let cityNameEN: String
     let iata: String
     var isGoal: Bool = false
+    var showLabel: Bool = true
 
     private var dotColor: Color {
         isGoal ? .orange : Color(red: 0.55, green: 0.75, blue: 1.0)
     }
 
     var body: some View {
-        // 圓點為錨定中心，標籤浮在上方
         Circle()
             .fill(dotColor)
             .frame(width: 8, height: 8)
             .shadow(color: dotColor.opacity(0.6), radius: 4, x: 0, y: 0)
             .overlay(alignment: .bottom) {
-                HStack(spacing: 4) {
-                    Text(cityNameEN)
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(isGoal ? 0.6 : 0.75))
-                        .lineLimit(1)
-                    Text(iata)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(isGoal ? .orange : .white)
+                if showLabel {
+                    HStack(spacing: 4) {
+                        Text(cityNameEN)
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(isGoal ? 0.6 : 0.75))
+                            .lineLimit(1)
+                        Text(iata)
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundStyle(isGoal ? .orange : .white)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color.black.opacity(0.6))
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(isGoal ? Color.orange.opacity(0.3) : Color.white.opacity(0.2), lineWidth: 0.5)
+                    )
+                    .fixedSize()
+                    .offset(y: -14) // 標籤向上偏移，不遮擋圓點
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(Color.black.opacity(0.6))
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(isGoal ? Color.orange.opacity(0.3) : Color.white.opacity(0.2), lineWidth: 0.5)
-                )
-                .fixedSize()
-                .offset(y: -14) // 標籤向上偏移，不遮擋圓點
             }
     }
 
