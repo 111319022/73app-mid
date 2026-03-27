@@ -397,7 +397,7 @@ struct DreamRadarCard: View {
         VStack(alignment: .leading, spacing: AviationTheme.Spacing.md) {
             // 標題列
             HStack {
-                Image(systemName: "radar")
+                Image(systemName: "dot.radiowaves.left.and.right")
                     .font(.body)
                     .foregroundStyle(AviationTheme.Colors.brandColor(colorScheme))
                 Text("夢想雷達")

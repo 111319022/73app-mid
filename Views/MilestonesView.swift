@@ -52,7 +52,6 @@ struct MilestonesView: View {
     }
 
 
-
     /// 未完成目標的航線（哩程不夠）
     private var goalRoutes: [GoalRoute] {
         let currentMiles = viewModel.mileageAccount?.totalMiles ?? 0
@@ -537,6 +536,9 @@ struct MilestonesView: View {
 
                 .tracking(2)
 
+            let currentMiles = viewModel.mileageAccount?.totalMiles ?? 0
+            let isGoalMode = routes.isEmpty || showGoalRoutes
+
             if !routes.isEmpty {
                 HStack(spacing: 32) {
 
@@ -546,13 +548,15 @@ struct MilestonesView: View {
 
                     StatColumn(
 
-                        value: totalSpentMiles >= 10000
+                        value: isGoalMode
+                            ? (currentMiles >= 10000
+                                ? String(format: "%.1fk", Double(currentMiles) / 1000.0)
+                                : "\(currentMiles)")
+                            : (totalSpentMiles >= 10000
+                                ? String(format: "%.1fk", Double(totalSpentMiles) / 1000.0)
+                                : "\(totalSpentMiles)"),
 
-                            ? String(format: "%.1fk", Double(totalSpentMiles) / 1000.0)
-
-                            : "\(totalSpentMiles)",
-
-                        label: "哩程"
+                        label: isGoalMode ? "目前哩程" : "哩程"
 
                     )
 
@@ -560,7 +564,6 @@ struct MilestonesView: View {
             } else if hasRouteContent {
                 HStack(spacing: 32) {
                     StatColumn(value: "\(allGoalRoutes.count)", label: "目標")
-                    let currentMiles = viewModel.mileageAccount?.totalMiles ?? 0
                     StatColumn(
                         value: currentMiles >= 10000
                             ? String(format: "%.1fk", Double(currentMiles) / 1000.0)
@@ -946,7 +949,7 @@ private struct AirportAnnotationView: View {
                             .stroke(isGoal ? Color.orange.opacity(0.3) : Color.white.opacity(0.2), lineWidth: 0.5)
                     )
                     .fixedSize()
-                    .offset(y: -14) // 標籤向上偏移，不遮擋圓點
+                    .offset(y: -14) 
                 }
             }
     }
