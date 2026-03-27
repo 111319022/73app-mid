@@ -19,6 +19,7 @@ final class Transaction {
     var promotionName: String? // 活動贈送：活動名稱（例如：開卡禮、生日禮）
     var linkedTicketID: UUID? // 兌換機票時連結的 RedeemedTicket ID
     
+    var programID: UUID?
     var account: MileageAccount? // CloudKit 要求 relationship 必須為 optional
 
     var amount: Decimal {

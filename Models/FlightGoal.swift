@@ -16,6 +16,7 @@ final class FlightGoal {
     var createdDate: Date = Date()
     var sortOrder: Int = 0 // 排序順序（越小越前面，釘選與非釘選分開排序）
     
+    var programID: UUID?
     var account: MileageAccount? // CloudKit 要求 relationship 必須為 optional
 
     var cabinClass: CabinClass {

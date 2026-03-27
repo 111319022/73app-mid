@@ -303,6 +303,22 @@ struct SettingsView: View {
                                         }
                                     }
                                     .buttonStyle(.plain)
+                                    
+                                    CustomDivider(colorScheme: colorScheme)
+                                    
+                                    NavigationLink(destination: ProgramSwitcherView(viewModel: viewModel)) {
+                                        SettingRow(
+                                            icon: "arrow.triangle.2.circlepath.circle.fill",
+                                            title: "里程計劃切換",
+                                            subtitle: "當前：\(viewModel.activeProgram?.name ?? "Asia Miles")"
+                                        ) {
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                                                .font(.subheadline)
+                                                .fontWeight(.semibold)
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                                 .background(AviationTheme.Colors.cardBackground(colorScheme))
                                 .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))

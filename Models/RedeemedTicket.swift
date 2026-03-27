@@ -18,6 +18,7 @@ final class RedeemedTicket {
     var flightNumber: String = ""
     var redeemedDate: Date = Date()
     var linkedTransactionID: UUID?
+    var programID: UUID?
 
     var cabinClass: CabinClass {
         get { CabinClass(rawValue: cabinClassRaw) ?? .economy }

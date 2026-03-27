@@ -17,6 +17,7 @@ struct CloudBackupView: View {
     @State private var backupToDelete: CKRecord.ID?
     @State private var showingBackupSuccess = false
     @State private var showingRestoreSuccess = false
+    @State private var showAllBackups = false
     
     private var lastBackupDate: Date? {
         lastBackupDateTimestamp > 0 ? Date(timeIntervalSince1970: lastBackupDateTimestamp) : nil
@@ -146,7 +147,28 @@ struct CloudBackupView: View {
                     
                     // MARK: - 雲端備份列表
                     VStack(alignment: .leading, spacing: 8) {
-                        SectionHeaderView(title: "雲端備份列表", colorScheme: colorScheme)
+                        HStack {
+                            SectionHeaderView(title: "雲端備份列表", colorScheme: colorScheme)
+                            
+                            Spacer()
+                            
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showAllBackups.toggle()
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: showAllBackups ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                                        .font(.subheadline)
+                                    Text(showAllBackups ? "所有計劃" : "目前計劃")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                }
+                                .foregroundColor(AviationTheme.Colors.cathayJade)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.trailing, 4)
                         
                         VStack(spacing: 0) {
                             if backupService.isLoadingList {
@@ -156,14 +178,14 @@ struct CloudBackupView: View {
                                         .padding(.vertical, 24)
                                     Spacer()
                                 }
-                            } else if backupService.backupRecords.isEmpty {
+                            } else if filteredBackupRecords.isEmpty {
                                 HStack {
                                     Spacer()
                                     VStack(spacing: 8) {
                                         Image(systemName: "icloud.slash")
                                             .font(.title2)
                                             .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
-                                        Text("尚無雲端備份")
+                                        Text(showAllBackups ? "尚無雲端備份" : "此計劃尚無備份")
                                             .font(AviationTheme.Typography.subheadline)
                                             .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
                                     }
@@ -171,7 +193,7 @@ struct CloudBackupView: View {
                                     Spacer()
                                 }
                             } else {
-                                ForEach(Array(backupService.backupRecords.enumerated()), id: \.element.id) { index, record in
+                                ForEach(Array(filteredBackupRecords.enumerated()), id: \.element.id) { index, record in
                                     if index > 0 {
                                         CustomDivider(colorScheme: colorScheme)
                                     }
@@ -201,7 +223,7 @@ struct CloudBackupView: View {
                 .padding(.bottom, AviationTheme.Spacing.xxl)
             }
         }
-        .navigationTitle("備份與同步")
+        .navigationTitle("iCloud 備份")
         .navigationBarTitleDisplayMode(.large)
         .task {
             await backupService.checkiCloudStatus()
@@ -280,15 +302,29 @@ struct CloudBackupView: View {
         }
     }
     
+    private var filteredBackupRecords: [CloudBackupService.BackupRecord] {
+        if showAllBackups {
+            return backupService.backupRecords
+        }
+        let currentName = viewModel.activeProgram?.name ?? "Asia Miles"
+        return backupService.backupRecords.filter { $0.programName == currentName }
+    }
+    
     private var dataSummaryText: String {
-        return "\(viewModel.transactions.count) 筆交易、\(viewModel.flightGoals.count) 個目標、\(viewModel.redeemedTickets.count) 張機票"
+        let name = viewModel.activeProgram?.name ?? "Asia Miles"
+        return "[\(name)] \(viewModel.transactions.count) 筆交易、\(viewModel.flightGoals.count) 個目標、\(viewModel.redeemedTickets.count) 張機票"
     }
     
     // MARK: - Actions
     
     private func performBackup() async {
         do {
-            try await backupService.createBackup(modelContext: modelContext)
+            try await backupService.createBackup(
+                modelContext: modelContext,
+                programID: viewModel.activeProgram?.id,
+                programName: viewModel.activeProgram?.name ?? "Asia Miles",
+                program: viewModel.activeProgram
+            )
             await backupService.fetchBackupList()
             showingBackupSuccess = true
         } catch {
@@ -299,7 +335,11 @@ struct CloudBackupView: View {
     
     private func performRestore(recordID: CKRecord.ID) async {
         do {
-            try await backupService.restoreFromBackup(recordID: recordID, modelContext: modelContext)
+            try await backupService.restoreFromBackup(
+                recordID: recordID,
+                modelContext: modelContext,
+                programID: viewModel.activeProgram?.id
+            )
             viewModel.loadData() // 重新載入記憶體中的資料
             showingRestoreSuccess = true
         } catch {
@@ -338,9 +378,19 @@ private struct BackupRecordRow: View {
                         .fontWeight(.medium)
                         .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
                     
-                    Text(record.deviceName)
-                        .font(AviationTheme.Typography.caption)
-                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    HStack(spacing: 6) {
+                        Text(record.deviceName)
+                            .font(AviationTheme.Typography.caption)
+                            .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                        
+                        Text("·")
+                            .font(AviationTheme.Typography.caption)
+                            .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                        
+                        Text(record.programName)
+                            .font(AviationTheme.Typography.caption)
+                            .foregroundColor(AviationTheme.Colors.cathayJade)
+                    }
                     
                     Text(record.recordCounts)
                         .font(AviationTheme.Typography.caption)

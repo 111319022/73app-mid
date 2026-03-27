@@ -9,12 +9,21 @@ struct MileryBackup: Codable {
     let version: Int
     let createdAt: Date
     let deviceName: String
+    let programName: String?  // v3: 所屬里程計劃名稱
     let account: AccountBackup
     let transactions: [TransactionBackup]
     let flightGoals: [FlightGoalBackup]
     let creditCards: [CreditCardRuleBackup]  // 舊版備份相容用，新版不再寫入
     let redeemedTickets: [RedeemedTicketBackup]
     let cardPreferences: [CardPreferenceBackup]?  // v2: 信用卡偏好設定
+    let program: MilageProgramBackup?  // v3: 里程計劃資訊
+}
+
+struct MilageProgramBackup: Codable {
+    let id: UUID
+    let name: String
+    let programTypeRaw: String
+    let isDefault: Bool
 }
 
 struct CardPreferenceBackup: Codable {
@@ -143,6 +152,7 @@ class CloudBackupService {
         let deviceName: String
         let schemaVersion: Int
         let recordCounts: String
+        let programName: String
     }
     
     // MARK: - iCloud 狀態檢查
@@ -184,21 +194,27 @@ class CloudBackupService {
     
     // MARK: - 建立備份
     
-    func createBackup(modelContext: ModelContext) async throws {
+    func createBackup(modelContext: ModelContext, programID: UUID?, programName: String, program: MileageProgram? = nil) async throws {
         isUploading = true
         uploadProgress = "正在準備資料..."
         defer { isUploading = false; uploadProgress = "" }
         
         try await ensureiCloudAvailable()
         
-        // 1. Fetch 所有 SwiftData 資料
-        let accounts = try modelContext.fetch(FetchDescriptor<MileageAccount>())
-        let transactions = try modelContext.fetch(FetchDescriptor<Transaction>())
-        let flightGoals = try modelContext.fetch(FetchDescriptor<FlightGoal>())
-        let redeemedTickets = try modelContext.fetch(FetchDescriptor<RedeemedTicket>())
+        // 1. Fetch 當前計劃的 SwiftData 資料
+        let allAccounts = try modelContext.fetch(FetchDescriptor<MileageAccount>())
+        let allTransactions = try modelContext.fetch(FetchDescriptor<Transaction>())
+        let allGoals = try modelContext.fetch(FetchDescriptor<FlightGoal>())
+        let allTickets = try modelContext.fetch(FetchDescriptor<RedeemedTicket>())
         let cardPrefs = (try? modelContext.fetch(FetchDescriptor<CardPreference>())) ?? []
         
-        guard let account = accounts.first else {
+        // 篩選屬於當前計劃的資料
+        let accounts = allAccounts.filter { $0.programID == programID }
+        let transactions = allTransactions.filter { $0.programID == programID }
+        let flightGoals = allGoals.filter { $0.programID == programID }
+        let redeemedTickets = allTickets.filter { $0.programID == programID }
+        
+        guard let account = accounts.sorted(by: { $0.totalMiles > $1.totalMiles }).first else {
             throw BackupError.noAccountData
         }
         
@@ -209,6 +225,7 @@ class CloudBackupService {
             version: 1,
             createdAt: Date(),
             deviceName: UIDevice.current.name,
+            programName: programName,
             account: AccountBackup(
                 totalMiles: account.totalMiles,
                 lastActivityDate: account.lastActivityDate
@@ -272,6 +289,14 @@ class CloudBackupService {
                     isActive: p.isActive,
                     tierRaw: p.tierRaw
                 )
+            },
+            program: program.map { p in
+                MilageProgramBackup(
+                    id: p.id,
+                    name: p.name,
+                    programTypeRaw: p.programTypeRaw,
+                    isDefault: p.isDefault
+                )
             }
         )
         
@@ -301,6 +326,7 @@ class CloudBackupService {
         record["backupDate"] = Date() as CKRecordValue
         record["deviceName"] = UIDevice.current.name as CKRecordValue
         record["schemaVersion"] = 1 as CKRecordValue
+        record["programName"] = programName as CKRecordValue
         record["recordCounts"] = "\(transactions.count) 筆交易、\(flightGoals.count) 個目標、\(redeemedTickets.count) 張機票" as CKRecordValue
         record["backupData"] = CKAsset(fileURL: tempURL)
         
@@ -380,7 +406,8 @@ class CloudBackupService {
                     backupDate: record["backupDate"] as? Date ?? record.creationDate ?? Date(),
                     deviceName: record["deviceName"] as? String ?? "未知裝置",
                     schemaVersion: record["schemaVersion"] as? Int ?? 1,
-                    recordCounts: record["recordCounts"] as? String ?? ""
+                    recordCounts: record["recordCounts"] as? String ?? "",
+                    programName: record["programName"] as? String ?? "Asia Miles"
                 )
             }
             .sorted { $0.backupDate > $1.backupDate }
@@ -394,7 +421,7 @@ class CloudBackupService {
     
     // MARK: - 還原備份
     
-    func restoreFromBackup(recordID: CKRecord.ID, modelContext: ModelContext) async throws {
+    func restoreFromBackup(recordID: CKRecord.ID, modelContext: ModelContext, programID: UUID?) async throws {
         isDownloading = true
         defer { isDownloading = false }
         
@@ -425,19 +452,42 @@ class CloudBackupService {
             throw BackupError.decodingFailed(error)
         }
         
-        // 3. 刪除所有本地資料
-        try modelContext.delete(model: Transaction.self)
-        try modelContext.delete(model: FlightGoal.self)
+        // 3. 刪除當前計劃的本地資料（保留其他計劃的資料）
+        let existingAccounts = (try? modelContext.fetch(FetchDescriptor<MileageAccount>())) ?? []
+        for account in existingAccounts where account.programID == programID {
+            modelContext.delete(account)
+        }
+        let existingTransactions = (try? modelContext.fetch(FetchDescriptor<Transaction>())) ?? []
+        for tx in existingTransactions where tx.programID == programID {
+            modelContext.delete(tx)
+        }
+        let existingGoals = (try? modelContext.fetch(FetchDescriptor<FlightGoal>())) ?? []
+        for goal in existingGoals where goal.programID == programID {
+            modelContext.delete(goal)
+        }
+        let existingTickets = (try? modelContext.fetch(FetchDescriptor<RedeemedTicket>())) ?? []
+        for ticket in existingTickets where ticket.programID == programID {
+            modelContext.delete(ticket)
+        }
+        // CardPreference 和 CreditCardRule 是全域共用，維持原本邏輯
         try modelContext.delete(model: CreditCardRule.self)
         try modelContext.delete(model: CardPreference.self)
-        try modelContext.delete(model: RedeemedTicket.self)
-        try modelContext.delete(model: MileageAccount.self)
         
-        // 4. 重建 MileageAccount
+        // 3.5 還原里程計劃名稱與類型（若備份中包含計劃資訊）
+        if let programBackup = backup.program, let programID {
+            let allPrograms = (try? modelContext.fetch(FetchDescriptor<MileageProgram>())) ?? []
+            if let existingProgram = allPrograms.first(where: { $0.id == programID }) {
+                existingProgram.name = programBackup.name
+                existingProgram.programTypeRaw = programBackup.programTypeRaw
+            }
+        }
+        
+        // 4. 重建 MileageAccount（綁定當前計劃）
         let newAccount = MileageAccount(
             totalMiles: backup.account.totalMiles,
             lastActivityDate: backup.account.lastActivityDate
         )
+        newAccount.programID = programID
         modelContext.insert(newAccount)
         
         // 5. 重建 Transactions
@@ -457,6 +507,7 @@ class CloudBackupService {
             )
             transaction.id = t.id // 保留原始 UUID
             transaction.costPerMile = t.costPerMile
+            transaction.programID = programID
             modelContext.insert(transaction)
             if newAccount.transactions == nil { newAccount.transactions = [] }
             newAccount.transactions?.append(transaction)
@@ -478,6 +529,7 @@ class CloudBackupService {
             goal.id = g.id
             goal.createdDate = g.createdDate
             goal.sortOrder = g.sortOrder
+            goal.programID = programID
             modelContext.insert(goal)
             if newAccount.flightGoals == nil { newAccount.flightGoals = [] }
             newAccount.flightGoals?.append(goal)
@@ -529,6 +581,7 @@ class CloudBackupService {
                 redeemedDate: r.redeemedDate,
                 linkedTransactionID: r.linkedTransactionID
             )
+            ticket.programID = programID
             modelContext.insert(ticket)
         }
         

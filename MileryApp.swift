@@ -167,7 +167,8 @@ struct MileryApp: App {
             FlightGoal.self,
             CreditCardRule.self,
             RedeemedTicket.self,
-            CardPreference.self
+            CardPreference.self,
+            MileageProgram.self
         ])
         
         let syncEnabled = UserDefaults.standard.object(forKey: "cloudKitSyncEnabled") as? Bool ?? true

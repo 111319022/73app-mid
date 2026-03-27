@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FB297D832F762AF6004A9DAC /* MileageProgram.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB297D822F762AF6004A9DAC /* MileageProgram.swift */; };
 		FB40838F2F703C0D00993DF0 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = FB40838E2F703C0100993DF0 /* README.md */; };
 		FB419C212F6B1C3B00A30AF9 /* CalculatorComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB419C202F6B1C3B00A30AF9 /* CalculatorComponents.swift */; };
 		FB419C242F6C1BA700A30AF9 /* CreditCardPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB419C232F6C1BA700A30AF9 /* CreditCardPageView.swift */; };
@@ -38,6 +39,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		FB297D822F762AF6004A9DAC /* MileageProgram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MileageProgram.swift; sourceTree = "<group>"; };
 		FB40838E2F703C0100993DF0 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		FB419C202F6B1C3B00A30AF9 /* CalculatorComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalculatorComponents.swift; sourceTree = "<group>"; };
 		FB419C232F6C1BA700A30AF9 /* CreditCardPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditCardPageView.swift; sourceTree = "<group>"; };
@@ -136,6 +138,7 @@
 				FBCA10202F70000100A1B2C3 /* RedeemedTicket.swift */,
 				FBF89D9F2F6AC2EE003DB1EB /* Transaction.swift */,
 				FBBABAF22F73B8320026B8D1 /* CardPreference.swift */,
+				FB297D822F762AF6004A9DAC /* MileageProgram.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -254,6 +257,7 @@
 				FB6BC0C22F70F4DC0011877D /* CloudBackupService.swift in Sources */,
 				FB419C212F6B1C3B00A30AF9 /* CalculatorComponents.swift in Sources */,
 				FB6BC0C02F70F45E0011877D /* CloudBackupView.swift in Sources */,
+				FB297D832F762AF6004A9DAC /* MileageProgram.swift in Sources */,
 				FBF89DB32F6AC2EE003DB1EB /* MainTabView.swift in Sources */,
 				FBF89DB42F6AC2EE003DB1EB /* MileageAccount.swift in Sources */,
 				FBCA10212F70000100A1B2C3 /* RedeemedTicket.swift in Sources */,

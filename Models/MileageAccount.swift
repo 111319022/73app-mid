@@ -5,6 +5,7 @@ import SwiftData
 final class MileageAccount {
     var totalMiles: Int = 0
     var lastActivityDate: Date = Date()
+    var programID: UUID?
     
     @Relationship(deleteRule: .cascade, inverse: \Transaction.account) var transactions: [Transaction]? = []
     @Relationship(deleteRule: .cascade, inverse: \FlightGoal.account) var flightGoals: [FlightGoal]? = []

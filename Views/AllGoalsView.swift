@@ -37,12 +37,14 @@ struct AllGoalsView: View {
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
                             
-                            Button {
-                                showingPopularRoutes = true
-                            } label: {
-                                Label("瀏覽熱門航線", systemImage: "star.fill")
+                            if viewModel.supportsCathayAwardChart {
+                                Button {
+                                    showingPopularRoutes = true
+                                } label: {
+                                    Label("瀏覽熱門航線", systemImage: "star.fill")
+                                }
+                                .buttonStyle(.borderedProminent)
                             }
-                            .buttonStyle(.borderedProminent)
                         }
                         .padding(.vertical, 60)
                     } else {
@@ -82,10 +84,12 @@ struct AllGoalsView: View {
                         } label: {
                             Label("自訂航線", systemImage: "plus.circle")
                         }
-                        Button {
-                            showingPopularRoutes = true
-                        } label: {
-                            Label("熱門航線", systemImage: "star")
+                        if viewModel.supportsCathayAwardChart {
+                            Button {
+                                showingPopularRoutes = true
+                            } label: {
+                                Label("熱門航線", systemImage: "star")
+                            }
                         }
                     } label: {
                         Image(systemName: "plus.circle.fill")
@@ -342,24 +346,26 @@ struct AddFlightGoalView: View {
         self.viewModel = viewModel
     }
     
-    /// 判斷是否為國泰可自動計算的航線（起點台北 + 目的地在國泰航點表內）
+    /// 判斷是否為國泰可自動計算的航線（起點台北 + 目的地在國泰航點表內 + 當前計劃支援）
     private var isCathayAutoRoute: Bool {
-        guard let origin = selectedOrigin?.iataCode,
+        guard viewModel.supportsCathayAwardChart,
+              let origin = selectedOrigin?.iataCode,
               let destination = selectedDestination?.iataCode else { return false }
         return origin.uppercased() == "TPE" && FlightCalculator.isCathayRouteFromTPE(destination: destination)
     }
     
     /// 起點為台北但目的地不在國泰航點表 → 需兌換寰宇一家夥伴
     private var isOneworldRequired: Bool {
-        guard let origin = selectedOrigin?.iataCode,
+        guard viewModel.supportsCathayAwardChart,
+              let origin = selectedOrigin?.iataCode,
               selectedDestination != nil else { return false }
         return origin.uppercased() == "TPE" && !isCathayAutoRoute
     }
     
-    /// 起點非台北 → 一律手動輸入
+    /// 起點非台北或非國泰計劃 → 一律手動輸入
     private var isNonTPEOrigin: Bool {
         guard let origin = selectedOrigin?.iataCode else { return false }
-        return origin.uppercased() != "TPE"
+        return origin.uppercased() != "TPE" || !viewModel.supportsCathayAwardChart
     }
     
     /// 是否需要使用者手動輸入哩程
@@ -367,7 +373,7 @@ struct AddFlightGoalView: View {
         return isOneworldRequired || isNonTPEOrigin
     }
     
-    /// 自動計算的哩程（僅國泰台北航線）
+    /// 自動計算的哩程（僅國泰台北航線且當前計劃支援）
     private var autoCathayMiles: Int? {
         guard isCathayAutoRoute,
               let origin = selectedOrigin?.iataCode,
@@ -678,24 +684,26 @@ struct EditFlightGoalView: View {
     
     private var airports = AirportDatabase.shared.getAllAirports()
     
-    /// 判斷是否為國泰可自動計算的航線（起點台北 + 目的地在國泰航點表內）
+    /// 判斷是否為國泰可自動計算的航線（起點台北 + 目的地在國泰航點表內 + 當前計劃支援）
     private var isCathayAutoRoute: Bool {
-        guard let origin = selectedOrigin?.iataCode,
+        guard viewModel.supportsCathayAwardChart,
+              let origin = selectedOrigin?.iataCode,
               let destination = selectedDestination?.iataCode else { return false }
         return origin.uppercased() == "TPE" && FlightCalculator.isCathayRouteFromTPE(destination: destination)
     }
     
     /// 起點為台北但目的地不在國泰航點表 → 需兌換寰宇一家夥伴
     private var isOneworldRequired: Bool {
-        guard let origin = selectedOrigin?.iataCode,
+        guard viewModel.supportsCathayAwardChart,
+              let origin = selectedOrigin?.iataCode,
               selectedDestination != nil else { return false }
         return origin.uppercased() == "TPE" && !isCathayAutoRoute
     }
     
-    /// 起點非台北 → 一律手動輸入
+    /// 起點非台北或非國泰計劃 → 一律手動輸入
     private var isNonTPEOrigin: Bool {
         guard let origin = selectedOrigin?.iataCode else { return false }
-        return origin.uppercased() != "TPE"
+        return origin.uppercased() != "TPE" || !viewModel.supportsCathayAwardChart
     }
     
     /// 是否需要使用者手動輸入哩程
@@ -703,7 +711,7 @@ struct EditFlightGoalView: View {
         return isOneworldRequired || isNonTPEOrigin
     }
     
-    /// 自動計算的哩程（僅國泰台北航線）
+    /// 自動計算的哩程（僅國泰台北航線且當前計劃支援）
     private var autoCathayMiles: Int? {
         guard isCathayAutoRoute,
               let origin = selectedOrigin?.iataCode,
@@ -745,8 +753,8 @@ struct EditFlightGoalView: View {
         _isPriority = State(initialValue: goal.isPriority)
         _isRoundTrip = State(initialValue: goal.isRoundTrip)
         
-        // 如果不是國泰自動航線，需要反推單程哩程作為手動輸入初始值
-        let isAuto = goal.origin.uppercased() == "TPE" && FlightCalculator.isCathayRouteFromTPE(destination: goal.destination)
+        // 如果不是國泰自動航線（或非國泰計劃），需要反推單程哩程作為手動輸入初始值
+        let isAuto = viewModel.supportsCathayAwardChart && goal.origin.uppercased() == "TPE" && FlightCalculator.isCathayRouteFromTPE(destination: goal.destination)
         if !isAuto {
             let singleMiles = goal.isRoundTrip ? goal.requiredMiles / 2 : goal.requiredMiles
             _manualMilesInput = State(initialValue: "\(singleMiles)")

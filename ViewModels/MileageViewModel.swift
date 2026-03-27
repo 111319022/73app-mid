@@ -12,6 +12,15 @@ class MileageViewModel {
     var flightGoals: [FlightGoal] = []
     var redeemedTickets: [RedeemedTicket] = []
     
+    // MARK: - 里程計劃
+    var programs: [MileageProgram] = []
+    var activeProgram: MileageProgram?
+    
+    /// 當前計劃是否支援國泰兌換表自動計算
+    var supportsCathayAwardChart: Bool {
+        activeProgram?.programType.supportsCathayAwardChart ?? true
+    }
+    
     // 使用者生日（用於計算生日當月加碼）
     var userBirthday: Date = Calendar.current.date(from: DateComponents(month: 1, day: 1)) ?? Date()
     
@@ -27,6 +36,135 @@ class MileageViewModel {
     private var remoteChangeObserver: NSObjectProtocol?  // 儲存 observer 以便清理
     
     init() {}
+    
+    // MARK: - 里程計劃管理
+    
+    /// 載入所有里程計劃並設定當前啟用計劃
+    func loadPrograms() {
+        guard let context = modelContext else { return }
+        let descriptor = FetchDescriptor<MileageProgram>(
+            sortBy: [SortDescriptor(\MileageProgram.createdDate)]
+        )
+        programs = (try? context.fetch(descriptor)) ?? []
+        
+        // 首次使用：若無任何計劃，建立預設的 Asia Miles 計劃
+        if programs.isEmpty {
+            let defaultProgram = MileageProgram(name: "Asia Miles", programType: .asiaMiles, isDefault: true)
+            context.insert(defaultProgram)
+            try? context.save()
+            programs = [defaultProgram]
+            ActiveProgramManager.activeProgramID = defaultProgram.id
+            
+            // 將既有資料綁定到此計劃
+            migrateExistingDataToProgram(defaultProgram)
+        }
+        
+        // 決定啟用計劃
+        if let savedID = ActiveProgramManager.activeProgramID,
+           let found = programs.first(where: { $0.id == savedID }) {
+            activeProgram = found
+        } else if let first = programs.first {
+            activeProgram = first
+            ActiveProgramManager.activeProgramID = first.id
+        }
+    }
+    
+    /// 將既有無 programID 的資料綁定到指定計劃
+    private func migrateExistingDataToProgram(_ program: MileageProgram) {
+        guard let context = modelContext else { return }
+        
+        let accounts = (try? context.fetch(FetchDescriptor<MileageAccount>())) ?? []
+        for account in accounts where account.programID == nil {
+            account.programID = program.id
+        }
+        
+        let transactions = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
+        for tx in transactions where tx.programID == nil {
+            tx.programID = program.id
+        }
+        
+        let goals = (try? context.fetch(FetchDescriptor<FlightGoal>())) ?? []
+        for goal in goals where goal.programID == nil {
+            goal.programID = program.id
+        }
+        
+        let tickets = (try? context.fetch(FetchDescriptor<RedeemedTicket>())) ?? []
+        for ticket in tickets where ticket.programID == nil {
+            ticket.programID = program.id
+        }
+        
+        try? context.save()
+        appLog("[Program] 既有資料已遷移至計劃: \(program.name)")
+    }
+    
+    /// 切換啟用的里程計劃
+    func switchProgram(to program: MileageProgram) {
+        activeProgram = program
+        ActiveProgramManager.activeProgramID = program.id
+        isInitialLoad = true
+        loadData()
+        isInitialLoad = false
+        knownDataFingerprint = fetchDataFingerprint()
+        appLog("[Program] 已切換至計劃: \(program.name)")
+    }
+    
+    /// 新增里程計劃
+    func addProgram(name: String, type: MilageProgramType) {
+        guard let context = modelContext else { return }
+        let program = MileageProgram(name: name, programType: type)
+        context.insert(program)
+        
+        // 建立該計劃的空帳戶
+        let account = MileageAccount()
+        account.programID = program.id
+        context.insert(account)
+        
+        try? context.save()
+        loadPrograms()
+        
+        // 自動切換到新計劃
+        switchProgram(to: program)
+    }
+    
+    /// 刪除里程計劃（不允許刪除預設計劃）
+    func deleteProgram(_ program: MileageProgram) {
+        guard let context = modelContext, !program.isDefault else { return }
+        
+        let pid = program.id
+        
+        // 刪除該計劃的所有資料
+        let accounts = (try? context.fetch(FetchDescriptor<MileageAccount>())) ?? []
+        for account in accounts where account.programID == pid {
+            context.delete(account)
+        }
+        
+        let transactions = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
+        for tx in transactions where tx.programID == pid {
+            context.delete(tx)
+        }
+        
+        let goals = (try? context.fetch(FetchDescriptor<FlightGoal>())) ?? []
+        for goal in goals where goal.programID == pid {
+            context.delete(goal)
+        }
+        
+        let tickets = (try? context.fetch(FetchDescriptor<RedeemedTicket>())) ?? []
+        for ticket in tickets where ticket.programID == pid {
+            context.delete(ticket)
+        }
+        
+        context.delete(program)
+        try? context.save()
+        
+        loadPrograms()
+        
+        // 切回預設計劃
+        if let defaultProgram = programs.first(where: { $0.isDefault }) ?? programs.first {
+            switchProgram(to: defaultProgram)
+        }
+        
+        appLog("[Program] 已刪除計劃: \(program.name)")
+    }
     
     deinit {
         if let observer = remoteChangeObserver {
@@ -50,6 +188,7 @@ class MileageViewModel {
     func initialize(context: ModelContext) {
         self.modelContext = context
         isInitialLoad = true
+        loadPrograms()
         loadData()
         isInitialLoad = false
         knownDataFingerprint = fetchDataFingerprint()
@@ -145,23 +284,30 @@ class MileageViewModel {
             .map { "\($0.cardBrandRaw)|\($0.isActive)|\($0.tierRaw)" }
             .joined(separator: ";")
 
-        return [accountPart, txPart, goalPart, ticketPart, cardPrefPart].joined(separator: "||")
+        let programPart = ActiveProgramManager.activeProgramID?.uuidString ?? "none"
+        return [programPart, accountPart, txPart, goalPart, ticketPart, cardPrefPart].joined(separator: "||")
     }
     
-    // 載入資料
+    // 載入資料（依當前啟用的里程計劃篩選）
     func loadData() {
         guard let context = modelContext else { return }
         
-        // 載入哩程帳戶（選擇哩程最高的帳戶，避免選到 CloudKit 同步造成的空帳戶）
+        let activePID = activeProgram?.id
+        
+        // 載入哩程帳戶（篩選當前計劃，選擇哩程最高的帳戶）
         let accountDescriptor = FetchDescriptor<MileageAccount>()
-        if let accounts = try? context.fetch(accountDescriptor), !accounts.isEmpty,
-           let account = accounts.sorted(by: { $0.totalMiles > $1.totalMiles }).first {
+        let allAccounts = (try? context.fetch(accountDescriptor)) ?? []
+        let programAccounts = allAccounts.filter { $0.programID == activePID }
+        
+        if !programAccounts.isEmpty,
+           let account = programAccounts.sorted(by: { $0.totalMiles > $1.totalMiles }).first {
             self.mileageAccount = account
             self.transactions = (account.transactions ?? []).sorted { $0.date > $1.date }
             self.flightGoals = account.flightGoals ?? []
         } else if isInitialLoad {
             // 只有首次載入且確定無帳戶時才建立新帳戶
             let newAccount = MileageAccount()
+            newAccount.programID = activePID
             context.insert(newAccount)
             self.mileageAccount = newAccount
             saveContext()
@@ -170,14 +316,16 @@ class MileageViewModel {
         // 載入信用卡：從 store 讀取用戶偏好後，以程式碼定義重建標準卡片
         rebuildCreditCards()
 
-        // 載入兌換成功紀錄（最新在前）
+        // 載入兌換成功紀錄（篩選當前計劃，最新在前）
         let redeemedDescriptor = FetchDescriptor<RedeemedTicket>(
             sortBy: [SortDescriptor(\RedeemedTicket.redeemedDate, order: .reverse)]
         )
-        self.redeemedTickets = (try? context.fetch(redeemedDescriptor)) ?? []
+        let allTickets = (try? context.fetch(redeemedDescriptor)) ?? []
+        self.redeemedTickets = allTickets.filter { $0.programID == activePID }
         
+        let programName = activeProgram?.name ?? "未知"
         let activeCards = creditCards.filter { $0.isActive }.map { $0.cardName }.joined(separator: ", ")
-        appLog("[Sync] loadData 完成: 哩程=\(mileageAccount?.totalMiles ?? -1), 交易=\(transactions.count)筆, 目標=\(flightGoals.count)個, 機票=\(redeemedTickets.count)張, 已啟用卡片: [\(activeCards.isEmpty ? "無" : activeCards)]")
+        appLog("[Sync] loadData 完成 [\(programName)]: 哩程=\(mileageAccount?.totalMiles ?? -1), 交易=\(transactions.count)筆, 目標=\(flightGoals.count)個, 機票=\(redeemedTickets.count)張, 已啟用卡片: [\(activeCards.isEmpty ? "無" : activeCards)]")
     }
     
     /// 信用卡規則以程式碼為準，用戶偏好（isActive / tier）透過 SwiftData CardPreference 同步。
@@ -288,6 +436,7 @@ class MileageViewModel {
             merchantName: merchantName,
             promotionName: promotionName
         )
+        transaction.programID = activeProgram?.id
         
         context.insert(transaction)
         if account.transactions == nil { account.transactions = [] }
@@ -327,6 +476,7 @@ class MileageViewModel {
         let maxOrder = sameGroup.map { $0.sortOrder }.max() ?? -1
         goal.sortOrder = maxOrder + 1
         
+        goal.programID = activeProgram?.id
         context.insert(goal)
         if account.flightGoals == nil { account.flightGoals = [] }
         account.flightGoals?.append(goal)
@@ -370,6 +520,7 @@ class MileageViewModel {
             flightNumber: flightNumber,
             redeemedDate: redeemedDate
         )
+        ticket.programID = activeProgram?.id
         context.insert(ticket)
 
         let trimmedAirline = airline.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -387,6 +538,7 @@ class MileageViewModel {
             flightRoute: "\(goal.origin)-\(goal.destination)",
             linkedTicketID: ticket.id
         )
+        transaction.programID = activeProgram?.id
         context.insert(transaction)
         if account.transactions == nil { account.transactions = [] }
         account.transactions?.append(transaction)

@@ -34,7 +34,8 @@ struct DashboardView: View {
                                 totalMiles: account.totalMiles,
                                 latestActivityMonth: account.latestActivityMonthText(),
                                 expiryDate: account.expiryDate(),
-                                daysUntilExpiry: account.daysUntilExpiry()
+                                daysUntilExpiry: account.daysUntilExpiry(),
+                                programName: viewModel.activeProgram?.name ?? "Asia Miles"
                             )
                         }
                         
@@ -185,6 +186,7 @@ struct HeroMilesCard: View {
     let latestActivityMonth: String
     let expiryDate: Date
     let daysUntilExpiry: Int
+    var programName: String = "Asia Miles"
     
     @State private var displayedMiles: Int = 0
     
@@ -219,7 +221,7 @@ struct HeroMilesCard: View {
                             )
                         
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Asia Miles")
+                            Text(programName)
                                 .font(AviationTheme.Typography.caption)
                                 .foregroundColor(AviationTheme.Colors.brandColor(colorScheme))
                             Text("可用哩程")
