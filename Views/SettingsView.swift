@@ -43,12 +43,11 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // 航空風格背景
+                //背景
                 AviationTheme.Gradients.dashboardBackground(colorScheme)
                     .ignoresSafeArea()
                 
                 ScrollView {
-                    // 加大各區塊之間的距離 (xl)
                     VStack(spacing: AviationTheme.Spacing.xl) {
                         
                         // MARK: - 外觀設定
@@ -304,13 +303,39 @@ struct SettingsView: View {
                                     }
                                     .buttonStyle(.plain)
                                     
-                                    CustomDivider(colorScheme: colorScheme)
-                                    
+                                }
+                                .background(AviationTheme.Colors.cardBackground(colorScheme))
+                                .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
+                                .shadow(color: AviationTheme.Shadows.cardShadow(colorScheme).opacity(0.5), radius: 8, x: 0, y: 2)
+                            }
+                            .padding(.horizontal, AviationTheme.Spacing.md)
+                            
+                            // MARK: - 開發中頁面 (隱藏)
+                            VStack(alignment: .leading, spacing: 8) {
+                                SectionHeaderView(title: "開發中頁面", colorScheme: colorScheme)
+                                
+                                VStack(spacing: 0) {
                                     NavigationLink(destination: ProgramSwitcherView(viewModel: viewModel)) {
                                         SettingRow(
                                             icon: "arrow.triangle.2.circlepath.circle.fill",
-                                            title: "里程計劃切換",
+                                            title: "里程計劃切換（開發中）",
                                             subtitle: "當前：\(viewModel.activeProgram?.name ?? "Asia Miles")"
+                                        ) {
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                                                .font(.subheadline)
+                                                .fontWeight(.semibold)
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                    
+                                    CustomDivider(colorScheme: colorScheme)
+                                    
+                                    NavigationLink(destination: OnboardingView(viewModel: viewModel)) {
+                                        SettingRow(
+                                            icon: "hand.wave.fill",
+                                            title: "新用戶歡迎頁面（開發中）",
+                                            subtitle: "預覽 Onboarding 流程"
                                         ) {
                                             Image(systemName: "chevron.right")
                                                 .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
@@ -531,7 +556,7 @@ struct SettingToggleRow: View {
                 .tint(AviationTheme.Colors.cathayJade)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10) // Toggle 本身較高，稍微減少一點 Padding
+        .padding(.vertical, 10)
         .contentShape(Rectangle())
     }
 }

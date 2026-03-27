@@ -14,6 +14,7 @@
 		FB6BC0C02F70F45E0011877D /* CloudBackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6BC0BF2F70F45E0011877D /* CloudBackupView.swift */; };
 		FB6BC0C22F70F4DC0011877D /* CloudBackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6BC0C12F70F4DC0011877D /* CloudBackupService.swift */; };
 		FB802BD72F71B84A008F0C83 /* airports.csv in Resources */ = {isa = PBXBuildFile; fileRef = FB802BD62F71B84A008F0C83 /* airports.csv */; };
+		FBA0AA9D2F76D0660063326D /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBA0AA9C2F76D0650063326D /* OnboardingView.swift */; };
 		FBBABAF12F73273E0026B8D1 /* DeveloperAccessService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBBABAF02F73273E0026B8D1 /* DeveloperAccessService.swift */; };
 		FBBABAF32F73B8320026B8D1 /* CardPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBBABAF22F73B8320026B8D1 /* CardPreference.swift */; };
 		FBCA10212F70000100A1B2C3 /* RedeemedTicket.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBCA10202F70000100A1B2C3 /* RedeemedTicket.swift */; };
@@ -49,6 +50,7 @@
 		FB802BD12F71B109008F0C83 /* milery.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = milery.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FB802BD62F71B84A008F0C83 /* airports.csv */ = {isa = PBXFileReference; lastKnownFileType = text; path = airports.csv; sourceTree = "<group>"; };
 		FB802BE02F727BB2008F0C83 /* milery-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "milery-Info.plist"; sourceTree = "<group>"; };
+		FBA0AA9C2F76D0650063326D /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		FBBABAF02F73273E0026B8D1 /* DeveloperAccessService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperAccessService.swift; sourceTree = "<group>"; };
 		FBBABAF22F73B8320026B8D1 /* CardPreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardPreference.swift; sourceTree = "<group>"; };
 		FBCA10202F70000100A1B2C3 /* RedeemedTicket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedeemedTicket.swift; sourceTree = "<group>"; };
@@ -167,6 +169,7 @@
 				FB419C232F6C1BA700A30AF9 /* CreditCardPageView.swift */,
 				FBF2F7CA2F6D333F0047DCE8 /* EditTransactionView.swift */,
 				FB6BC0BF2F70F45E0011877D /* CloudBackupView.swift */,
+				FBA0AA9C2F76D0650063326D /* OnboardingView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -263,6 +266,7 @@
 				FBCA10212F70000100A1B2C3 /* RedeemedTicket.swift in Sources */,
 				FBF89DB52F6AC2EE003DB1EB /* Transaction.swift in Sources */,
 				FBF89DB62F6AC2EE003DB1EB /* CreditCardRule.swift in Sources */,
+				FBA0AA9D2F76D0660063326D /* OnboardingView.swift in Sources */,
 				FB419C242F6C1BA700A30AF9 /* CreditCardPageView.swift in Sources */,
 				FBF89DB82F6AC2EE003DB1EB /* DashboardView.swift in Sources */,
 				FBF89DB92F6AC2EE003DB1EB /* AirportDatabase.swift in Sources */,
@@ -408,7 +412,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = milery.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 45SQT63B67;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -447,7 +451,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = milery.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 45SQT63B67;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
