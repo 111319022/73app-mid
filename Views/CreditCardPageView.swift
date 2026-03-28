@@ -51,26 +51,37 @@ struct CreditCardCell: View {
         card.tierDefinition
     }
     
-    var cardGradient: LinearGradient {
-        let colors = tierDef?.gradient ?? [Color.gray, Color.gray.opacity(0.6)]
-        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
-    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // MARK: 卡面視覺
-            cardVisual
-                .padding(.horizontal, AviationTheme.Spacing.md)
-                .padding(.top, AviationTheme.Spacing.md)
+            // MARK: 卡片名稱
+            VStack(alignment: .leading, spacing: 2) {
+                Text(card.bankName)
+                    .font(AviationTheme.Typography.caption)
+                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                Text(card.cardName)
+                    .font(AviationTheme.Typography.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+            }
+            .padding(.horizontal, AviationTheme.Spacing.md)
+            .padding(.top, AviationTheme.Spacing.md)
             
-            // MARK: 等級選擇（通用）
+            // MARK: 卡面視覺（僅有圖片時顯示）
+            if let def = brandDef, def.usesCardImage, tierDef?.cardImageName != nil {
+                cardVisual
+                    .padding(.horizontal, AviationTheme.Spacing.md)
+                    .padding(.top, AviationTheme.Spacing.sm)
+            }
+            
+            // MARK: 等級選擇
             if let def = brandDef, def.tiers.count > 1 {
                 tierPicker(definition: def)
                     .padding(.horizontal, AviationTheme.Spacing.md)
                     .padding(.top, AviationTheme.Spacing.md)
             }
             
-            // MARK: 費率資訊（通用）
+            // MARK: 費率資訊
             if let def = brandDef {
                 rateInfoSection(definition: def)
             }
@@ -94,48 +105,16 @@ struct CreditCardCell: View {
     // MARK: - 卡面視覺
     @ViewBuilder
     private var cardVisual: some View {
-        if let def = brandDef, def.usesCardImage, let imageName = tierDef?.cardImageName {
-            // 使用實際卡片圖片
+        if let imageName = tierDef?.cardImageName {
             Image(imageName)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md))
                 .shadow(color: .black.opacity(0.25), radius: 6, x: 0, y: 3)
-        } else {
-            // 使用漸層色卡面
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
-                    .fill(cardGradient)
-                    .frame(height: 180)
-                    .shadow(color: .black.opacity(0.25), radius: 6, x: 0, y: 3)
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Image(systemName: "creditcard.fill")
-                            .font(.title2)
-                        Spacer()
-                        Image(systemName: "airplane.circle.fill")
-                            .font(.title2)
-                    }
-                    
-                    Spacer()
-                    
-                    Text(card.bankName)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .opacity(0.8)
-                    
-                    Text(card.cardName)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                }
-                .foregroundStyle(.white)
-                .padding(AviationTheme.Spacing.lg)
-            }
         }
     }
     
-    // MARK: - 等級選擇器（通用）
+    // MARK: - 等級選擇器
     private func tierPicker(definition: CardBrandDefinition) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("卡片等級")
