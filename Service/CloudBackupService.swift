@@ -43,7 +43,8 @@ struct TransactionBackup: Codable {
     let amount: Decimal
     let earnedMiles: Int
     let sourceRaw: String
-    let acceleratorCategoryRaw: String?
+    let acceleratorCategoryRaw: String?  // 舊版備份相容
+    let cardSubcategoryID: String?       // 新版統一子類別
     let notes: String
     let costPerMile: Double
     let flightRoute: String?
@@ -257,7 +258,8 @@ class CloudBackupService {
                     amount: t.amount,
                     earnedMiles: t.earnedMiles,
                     sourceRaw: t.source.rawValue,
-                    acceleratorCategoryRaw: t.acceleratorCategory?.rawValue,
+                    acceleratorCategoryRaw: t.resolvedSubcategoryID,
+                    cardSubcategoryID: t.resolvedSubcategoryID,
                     notes: t.notes,
                     costPerMile: t.costPerMile,
                     flightRoute: t.flightRoute,
@@ -512,12 +514,14 @@ class CloudBackupService {
         
         // 5. 重建 Transactions
         for t in backup.transactions {
+            // 優先使用新版 cardSubcategoryID，fallback 到舊版 acceleratorCategoryRaw
+            let subcategoryID = t.cardSubcategoryID ?? t.acceleratorCategoryRaw
             let transaction = Transaction(
                 date: t.date,
                 amount: t.amount,
                 earnedMiles: t.earnedMiles,
                 source: MileageSource(rawValue: t.sourceRaw) ?? .cardGeneral,
-                acceleratorCategory: t.acceleratorCategoryRaw.flatMap { AcceleratorCategory(rawValue: $0) },
+                subcategoryID: subcategoryID,
                 notes: t.notes,
                 flightRoute: t.flightRoute,
                 conversionSource: t.conversionSource,
@@ -563,7 +567,7 @@ class CloudBackupService {
                     let pref = CardPreference(
                         cardBrand: brand,
                         isActive: p.isActive,
-                        tier: CathayCardTier(rawValue: p.tierRaw)
+                        tierID: p.tierRaw
                     )
                     modelContext.insert(pref)
                 }
@@ -575,7 +579,7 @@ class CloudBackupService {
                     let pref = CardPreference(
                         cardBrand: brand,
                         isActive: c.isActive,
-                        tier: CathayCardTier(rawValue: c.cardTierRaw)
+                        tierID: c.cardTierRaw
                     )
                     modelContext.insert(pref)
                 }

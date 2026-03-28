@@ -10,18 +10,13 @@ final class CardPreference {
     var isActive: Bool = false
     var tierRaw: String = ""
     
-    init(cardBrand: CardBrand, isActive: Bool, tier: CathayCardTier? = nil) {
+    init(cardBrand: CardBrand, isActive: Bool, tierID: String = "") {
         self.cardBrandRaw = cardBrand.rawValue
         self.isActive = isActive
-        self.tierRaw = tier?.rawValue ?? ""
+        self.tierRaw = tierID
     }
     
     var cardBrand: CardBrand? {
         CardBrand(rawValue: cardBrandRaw)
-    }
-    
-    var cathayTier: CathayCardTier? {
-        guard !tierRaw.isEmpty else { return nil }
-        return CathayCardTier(rawValue: tierRaw)
     }
 }

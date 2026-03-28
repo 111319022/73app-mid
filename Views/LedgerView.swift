@@ -15,20 +15,20 @@ struct LedgerView: View {
         }
     }
     
-    // 按類別統計（加速器再細分子類別）
-    var categoryStats: [(source: MileageSource, accelerator: AcceleratorCategory?, amount: Decimal, miles: Int)] {
+    // 按類別統計（子類別再細分）
+    var categoryStats: [(source: MileageSource, subcategoryID: String?, amount: Decimal, miles: Int)] {
         struct GroupKey: Hashable {
             let source: MileageSource
-            let accelerator: AcceleratorCategory?
+            let subcategoryID: String?
         }
         let grouped = Dictionary(grouping: filteredTransactions) {
             GroupKey(source: $0.source,
-                     accelerator: $0.source == .cardAccelerator ? $0.acceleratorCategory : nil)
+                     subcategoryID: $0.resolvedSubcategoryID)
         }
         return grouped.map { key, transactions in
             let amount = transactions.reduce(Decimal(0)) { $0 + $1.amount }
             let miles = transactions.reduce(0) { $0 + $1.earnedMiles }
-            return (key.source, key.accelerator, amount, miles)
+            return (key.source, key.subcategoryID, amount, miles)
         }.sorted { abs($0.miles) > abs($1.miles) }
     }
     
@@ -107,7 +107,7 @@ struct LedgerView: View {
                                     ForEach(Array(statsToShow.enumerated()), id: \.offset) { _, stat in
                                         CompactCategoryStatRow(
                                             source: stat.source,
-                                            accelerator: stat.accelerator,
+                                            subcategoryID: stat.subcategoryID,
                                             amount: stat.amount,
                                             miles: stat.miles,
                                             colorScheme: colorScheme
@@ -282,7 +282,7 @@ struct LedgerView: View {
 // MARK: - 精簡版類別統計列（用於統計卡片右側）
 struct CompactCategoryStatRow: View {
     let source: MileageSource
-    var accelerator: AcceleratorCategory? = nil
+    var subcategoryID: String? = nil
     let amount: Decimal
     let miles: Int
     let colorScheme: ColorScheme
@@ -291,18 +291,19 @@ struct CompactCategoryStatRow: View {
         amount > 0
     }
     
-    /// 顯示名稱：加速器帶子類別
+    /// 顯示名稱：帶子類別
     var displayName: String {
-        if source == .cardAccelerator, let acc = accelerator {
-            return "\(source.rawValue)・\(acc.rawValue)"
+        if let subID = subcategoryID {
+            return "\(source.rawValue)・\(subID)"
         }
         return source.rawValue
     }
 
-    /// 圖標：加速器用子類別 icon
+    /// 圖標：有子類別時用子類別 icon
     var displayIcon: String {
-        if source == .cardAccelerator, let acc = accelerator {
-            return acc.icon
+        if let subID = subcategoryID,
+           let cat = CardBrandRegistry.spendingCategory(for: subID) {
+            return cat.icon
         }
         return source.icon
     }
@@ -696,8 +697,8 @@ struct TransactionDetailRow: View {
     /// 根據來源類型回傳對應的明細文字
     var sourceDetail: String? {
         switch transaction.source {
-        case .cardAccelerator:
-            return transaction.acceleratorCategory?.rawValue
+        case .cardAccelerator, .taishinDesignated:
+            return transaction.resolvedSubcategoryID
         case .specialMerchant:
             return transaction.merchantName
         case .pointsConversion, .pointsTransfer:

@@ -5,22 +5,29 @@ import SwiftData
 final class Transaction {
     var id: UUID = UUID()
     var date: Date = Date()
-    @Attribute(originalName: "amount") var amountValue: Double = 0 // 持久化用：CloudKit 友善型別
+    @Attribute(originalName: "amount") var amountValue: Double = 0
     var earnedMiles: Int = 0
     @Attribute(originalName: "source") var sourceRaw: String = MileageSource.cardGeneral.rawValue
-    @Attribute(originalName: "acceleratorCategory") var acceleratorCategoryRaw: String? // 加速器類別（如果適用）
+    
+    // 統一子類別欄位：取代舊的 acceleratorCategoryRaw 和 taishinDesignatedCategoryRaw
+    var cardSubcategoryID: String?
+    
+    // 舊欄位保留（向後相容 CloudKit 既有資料，讀取時自動遷移到 cardSubcategoryID）
+    @Attribute(originalName: "acceleratorCategory") var acceleratorCategoryRaw: String?
+    var taishinDesignatedCategoryRaw: String?
+    
     var notes: String = ""
-    var costPerMile: Double = 0 // 每哩成本（自動計算）
+    var costPerMile: Double = 0
     
     // 額外資訊欄位
-    var flightRoute: String? // 飛行累積：航線（例如：TPE-NRT）
-    var conversionSource: String? // 銀行點數兌換/他點轉入：來源（例如：國泰世華銀行、Marriott Bonvoy）
-    var merchantName: String? // 特店消費累積：商家名稱（例如：星巴克、誠品書店）
-    var promotionName: String? // 活動贈送：活動名稱（例如：開卡禮、生日禮）
-    var linkedTicketID: UUID? // 兌換機票時連結的 RedeemedTicket ID
+    var flightRoute: String?
+    var conversionSource: String?
+    var merchantName: String?
+    var promotionName: String?
+    var linkedTicketID: UUID?
     
     var programID: UUID?
-    var account: MileageAccount? // CloudKit 要求 relationship 必須為 optional
+    var account: MileageAccount?
 
     var amount: Decimal {
         get { NSDecimalNumber(value: amountValue).decimalValue }
@@ -28,20 +35,43 @@ final class Transaction {
     }
 
     var source: MileageSource {
-        get { MileageSource(rawValue: sourceRaw) ?? .cardGeneral }
+        get {
+            if let s = MileageSource(rawValue: sourceRaw) { return s }
+            // 向後相容舊版 raw value
+            switch sourceRaw {
+            case "聯名卡一般消費": return .cardGeneral
+            case "聯名卡哩程加速器": return .cardAccelerator
+            default: return .cardGeneral
+            }
+        }
         set { sourceRaw = newValue.rawValue }
     }
-
-    var acceleratorCategory: AcceleratorCategory? {
-        get { acceleratorCategoryRaw.flatMap { AcceleratorCategory(rawValue: $0) } }
-        set { acceleratorCategoryRaw = newValue?.rawValue }
+    
+    /// 統一的子類別存取（自動從舊欄位遷移）
+    var resolvedSubcategoryID: String? {
+        get {
+            // 優先使用新欄位，若為空則從舊欄位遷移
+            if let id = cardSubcategoryID { return id }
+            if let old = acceleratorCategoryRaw { return old }
+            if let old = taishinDesignatedCategoryRaw { return old }
+            return nil
+        }
+        set {
+            cardSubcategoryID = newValue
+            // 同步寫入舊欄位（向後相容）
+            if source == .cardAccelerator {
+                acceleratorCategoryRaw = newValue
+            } else if source == .taishinDesignated {
+                taishinDesignatedCategoryRaw = newValue
+            }
+        }
     }
     
-    init(date: Date = Date(), 
-         amount: Decimal, 
-         earnedMiles: Int, 
+    init(date: Date = Date(),
+         amount: Decimal,
+         earnedMiles: Int,
          source: MileageSource,
-         acceleratorCategory: AcceleratorCategory? = nil,
+         subcategoryID: String? = nil,
          notes: String = "",
          flightRoute: String? = nil,
          conversionSource: String? = nil,
@@ -53,7 +83,13 @@ final class Transaction {
         self.amountValue = NSDecimalNumber(decimal: amount).doubleValue
         self.earnedMiles = earnedMiles
         self.sourceRaw = source.rawValue
-        self.acceleratorCategoryRaw = acceleratorCategory?.rawValue
+        self.cardSubcategoryID = subcategoryID
+        // 同步舊欄位
+        if source == .cardAccelerator {
+            self.acceleratorCategoryRaw = subcategoryID
+        } else if source == .taishinDesignated {
+            self.taishinDesignatedCategoryRaw = subcategoryID
+        }
         self.notes = notes
         self.flightRoute = flightRoute
         self.conversionSource = conversionSource
@@ -61,7 +97,6 @@ final class Transaction {
         self.promotionName = promotionName
         self.linkedTicketID = linkedTicketID
         
-        // 計算每哩成本
         if earnedMiles > 0 {
             self.costPerMile = Double(truncating: amount as NSDecimalNumber) / Double(earnedMiles)
         } else {
@@ -72,8 +107,10 @@ final class Transaction {
 
 // 里程來源
 enum MileageSource: String, Codable, CaseIterable {
-    case cardGeneral = "聯名卡一般消費"
-    case cardAccelerator = "聯名卡哩程加速器"
+    case cardGeneral = "刷卡一般消費"
+    case cardAccelerator = "哩程加速器"
+    case taishinOverseas = "國外一般消費"
+    case taishinDesignated = "越飛越有哩"
     case specialMerchant = "特店消費累積"
     case promotion = "活動贈送"
     case pointsConversion = "銀行點數兌換"
@@ -85,6 +122,8 @@ enum MileageSource: String, Codable, CaseIterable {
         switch self {
         case .cardGeneral: return "creditcard"
         case .cardAccelerator: return "bolt.fill"
+        case .taishinOverseas: return "globe.asia.australia.fill"
+        case .taishinDesignated: return "sparkles"
         case .specialMerchant: return "storefront"
         case .promotion: return "gift.fill"
         case .pointsConversion: return "arrow.triangle.2.circlepath"
@@ -98,38 +137,14 @@ enum MileageSource: String, Codable, CaseIterable {
         switch self {
         case .cardGeneral: return "blue"
         case .cardAccelerator: return "orange"
+        case .taishinOverseas: return "teal"
+        case .taishinDesignated: return "orange"
         case .specialMerchant: return "purple"
         case .promotion: return "pink"
         case .pointsConversion: return "green"
         case .pointsTransfer: return "indigo"
         case .flight: return "cyan"
         case .ticketRedemption: return "indigo"
-        }
-    }
-}
-
-// 加速器類別（國泰世華亞萬卡的四大加速器）
-enum AcceleratorCategory: String, Codable, CaseIterable {
-    case overseas = "海外"
-    case travel = "旅遊交通"
-    case daily = "日常消費"
-    case leisure = "休閒娛樂"
-    
-    var icon: String {
-        switch self {
-        case .overseas: return "globe.asia.australia.fill"
-        case .travel: return "airplane.departure"
-        case .daily: return "cart.fill"
-        case .leisure: return "theatermasks.fill"
-        }
-    }
-    
-    var acceleratorDescription: String {
-        switch self {
-        case .overseas: return "海外消費（含線上外幣交易）"
-        case .travel: return "國內外航空、飯店、旅行社、租車"
-        case .daily: return "超市、量販、加油、電信費"
-        case .leisure: return "電影院、KTV、健身房、遊樂園"
         }
     }
 }

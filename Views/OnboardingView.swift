@@ -12,8 +12,11 @@ struct OnboardingView: View {
     @State private var selectedProgramType: MilageProgramType = .asiaMiles
     
     // Page 3: 信用卡選擇
-    @State private var selectedCathayTier: CathayCardTier? = nil
+    @State private var selectedCathayTierID: String? = nil
     @State private var enableTaishinCard = false
+    
+    private let cathayDefinition = CathayUnitedBankCard()
+    private let taishinDefinition = TaishinCathayCard()
     
     // Page 4: Cloudkit同步設定
     @AppStorage("cloudKitSyncEnabled") private var cloudKitSyncEnabled: Bool = true
@@ -229,7 +232,7 @@ struct OnboardingView: View {
                         .padding(.leading, 4)
                     
                     VStack(spacing: AviationTheme.Spacing.sm) {
-                        ForEach(CathayCardTier.allCases, id: \.self) { tier in
+                        ForEach(cathayDefinition.tiers) { tier in
                             cathayTierCard(tier)
                         }
                     }
@@ -253,40 +256,43 @@ struct OnboardingView: View {
         }
     }
     
-    private func cathayTierCard(_ tier: CathayCardTier) -> some View {
-        Button {
+    private func cathayTierCard(_ tier: CardTierDefinition) -> some View {
+        let isSelected = selectedCathayTierID == tier.id
+        return Button {
             withAnimation(.spring(duration: 0.25)) {
-                if selectedCathayTier == tier {
-                    selectedCathayTier = nil
+                if selectedCathayTierID == tier.id {
+                    selectedCathayTierID = nil
                 } else {
-                    selectedCathayTier = tier
+                    selectedCathayTierID = tier.id
                 }
             }
         } label: {
             HStack(spacing: 14) {
-                Image(tier.cardImageName)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 60)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                if let imageName = tier.cardImageName {
+                    Image(imageName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(tier.rawValue)
+                    Text(tier.id)
                         .font(AviationTheme.Typography.headline)
                         .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
                     
-                    Text("一般 \(tier.baseRate.formatted()) 元/哩 ・ 加速 \(tier.acceleratorRate.formatted()) 元/哩")
+                    Text("一般 \(tier.rates.baseRate.formatted()) 元/哩 ・ 加速 \(tier.rates.secondaryRate.formatted()) 元/哩")
                         .font(AviationTheme.Typography.caption)
                         .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
                 }
                 
                 Spacer()
                 
-                Image(systemName: selectedCathayTier == tier
+                Image(systemName: isSelected
                       ? "checkmark.circle.fill"
                       : "circle")
                     .font(.title3)
-                    .foregroundColor(selectedCathayTier == tier
+                    .foregroundColor(isSelected
                                     ? AviationTheme.Colors.cathayJade
                                     : AviationTheme.Colors.tertiaryText(colorScheme))
             }
@@ -295,7 +301,7 @@ struct OnboardingView: View {
             .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
             .overlay(
                 RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg)
-                    .stroke(selectedCathayTier == tier
+                    .stroke(isSelected
                             ? AviationTheme.Colors.cathayJade
                             : Color.clear,
                             lineWidth: 2)

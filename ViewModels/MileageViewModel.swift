@@ -31,15 +31,14 @@ class MileageViewModel {
     // MARK: - CloudKit 遠端同步狀態
     var hasRemoteChanges: Bool = false
     private var knownDataFingerprint: String = ""
-    private var isInitialLoad: Bool = true  // 只有首次載入時才建立預設資料
-    private var remoteChangeWorkItem: DispatchWorkItem?  // 防抖用
-    private var remoteChangeObserver: NSObjectProtocol?  // 儲存 observer 以便清理
+    private var isInitialLoad: Bool = true
+    private var remoteChangeWorkItem: DispatchWorkItem?
+    private var remoteChangeObserver: NSObjectProtocol?
     
     init() {}
     
     // MARK: - 里程計劃管理
     
-    /// 載入所有里程計劃並設定當前啟用計劃
     func loadPrograms() {
         guard let context = modelContext else { return }
         let descriptor = FetchDescriptor<MileageProgram>(
@@ -47,10 +46,8 @@ class MileageViewModel {
         )
         programs = (try? context.fetch(descriptor)) ?? []
         
-        // 合併重複的預設計劃（CloudKit 同步可能導致多台裝置各自建立預設計劃）
         deduplicateDefaultPrograms()
         
-        // 首次使用：若無任何計劃，建立預設的 Asia Miles 計劃
         if programs.isEmpty {
             let defaultProgram = MileageProgram(name: "Asia Miles", programType: .asiaMiles, isDefault: true)
             context.insert(defaultProgram)
@@ -58,11 +55,9 @@ class MileageViewModel {
             programs = [defaultProgram]
             ActiveProgramManager.activeProgramID = defaultProgram.id
             
-            // 將既有資料綁定到此計劃
             migrateExistingDataToProgram(defaultProgram)
         }
         
-        // 決定啟用計劃
         if let savedID = ActiveProgramManager.activeProgramID,
            let found = programs.first(where: { $0.id == savedID }) {
             activeProgram = found
@@ -72,20 +67,15 @@ class MileageViewModel {
         }
     }
     
-    /// 合併重複的預設計劃：CloudKit 同步時，多台裝置可能各自建立了 isDefault=true 的計劃，
-    /// 需要將它們合併為同一個，並將資料的 programID 統一指向保留的計劃。
     private func deduplicateDefaultPrograms() {
         guard let context = modelContext else { return }
         
-        // 找出所有 isDefault == true 的計劃
         let defaultPrograms = programs.filter { $0.isDefault }
         guard defaultPrograms.count > 1 else { return }
         
-        // 保留最早建立的計劃（或擁有最多資料的計劃）
         let allAccounts = (try? context.fetch(FetchDescriptor<MileageAccount>())) ?? []
         let allTransactions = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
         
-        // 選擇擁有最多交易的計劃作為保留對象，若交易數相同則選最早建立的
         let keepProgram = defaultPrograms.max { a, b in
             let aCount = allTransactions.filter { $0.programID == a.id }.count
                        + allAccounts.filter { $0.programID == a.id }.map { $0.totalMiles }.reduce(0, +)
@@ -101,7 +91,6 @@ class MileageViewModel {
         let duplicateIDs = Set(duplicates.map { $0.id })
         appLog("[Program] 偵測到 \(defaultPrograms.count) 個重複的預設計劃，合併至: \(keepProgram.id.uuidString.prefix(8))")
         
-        // 將所有重複計劃的資料遷移到保留的計劃
         let allGoals = (try? context.fetch(FetchDescriptor<FlightGoal>())) ?? []
         let allTickets = (try? context.fetch(FetchDescriptor<RedeemedTicket>())) ?? []
         
@@ -118,12 +107,10 @@ class MileageViewModel {
             ticket.programID = keepProgram.id
         }
         
-        // 合併帳戶：將重複計劃的帳戶哩程合併到保留帳戶
         let keepAccounts = allAccounts.filter { $0.programID == keepProgram.id }
         let duplicateAccounts = allAccounts.filter { duplicateIDs.contains($0.programID ?? UUID()) }
         
         if let mainAccount = keepAccounts.sorted(by: { $0.totalMiles > $1.totalMiles }).first {
-            // 將重複帳戶的交易/目標關聯轉移到主帳戶
             for dupAccount in duplicateAccounts {
                 for tx in dupAccount.transactions ?? [] {
                     if mainAccount.transactions == nil { mainAccount.transactions = [] }
@@ -133,7 +120,6 @@ class MileageViewModel {
                     if mainAccount.flightGoals == nil { mainAccount.flightGoals = [] }
                     mainAccount.flightGoals?.append(goal)
                 }
-                // 更新最後活動日期
                 if dupAccount.lastActivityDate > mainAccount.lastActivityDate {
                     mainAccount.lastActivityDate = dupAccount.lastActivityDate
                 }
@@ -141,26 +127,22 @@ class MileageViewModel {
             }
         }
         
-        // 刪除重複的計劃
         for dup in duplicates {
             context.delete(dup)
         }
         
         try? context.save()
         
-        // 重新讀取計劃列表
         let descriptor = FetchDescriptor<MileageProgram>(
             sortBy: [SortDescriptor(\MileageProgram.createdDate)]
         )
         programs = (try? context.fetch(descriptor)) ?? []
         
-        // 更新 activeProgramID 指向保留的計劃
         ActiveProgramManager.activeProgramID = keepProgram.id
         
         appLog("[Program] 重複計劃合併完成，保留計劃: \(keepProgram.name) (\(keepProgram.id.uuidString.prefix(8)))")
     }
     
-    /// 將既有無 programID 的資料綁定到指定計劃
     private func migrateExistingDataToProgram(_ program: MileageProgram) {
         guard let context = modelContext else { return }
         
@@ -188,7 +170,6 @@ class MileageViewModel {
         appLog("[Program] 既有資料已遷移至計劃: \(program.name)")
     }
     
-    /// 將 programID 為 nil 或不屬於任何現有計劃的孤兒資料，綁定到當前啟用計劃
     private func migrateOrphanedDataToActiveProgram() {
         guard let context = modelContext, let activePID = activeProgram?.id else { return }
         
@@ -225,7 +206,6 @@ class MileageViewModel {
         }
     }
     
-    /// 切換啟用的里程計劃
     func switchProgram(to program: MileageProgram) {
         activeProgram = program
         ActiveProgramManager.activeProgramID = program.id
@@ -236,13 +216,11 @@ class MileageViewModel {
         appLog("[Program] 已切換至計劃: \(program.name)")
     }
     
-    /// 新增里程計劃
     func addProgram(name: String, type: MilageProgramType) {
         guard let context = modelContext else { return }
         let program = MileageProgram(name: name, programType: type)
         context.insert(program)
         
-        // 建立該計劃的空帳戶
         let account = MileageAccount()
         account.programID = program.id
         context.insert(account)
@@ -250,17 +228,14 @@ class MileageViewModel {
         try? context.save()
         loadPrograms()
         
-        // 自動切換到新計劃
         switchProgram(to: program)
     }
     
-    /// 刪除里程計劃（不允許刪除預設計劃）
     func deleteProgram(_ program: MileageProgram) {
         guard let context = modelContext, !program.isDefault else { return }
         
         let pid = program.id
         
-        // 刪除該計劃的所有資料
         let accounts = (try? context.fetch(FetchDescriptor<MileageAccount>())) ?? []
         for account in accounts where account.programID == pid {
             context.delete(account)
@@ -286,7 +261,6 @@ class MileageViewModel {
         
         loadPrograms()
         
-        // 切回預設計劃
         if let defaultProgram = programs.first(where: { $0.isDefault }) ?? programs.first {
             switchProgram(to: defaultProgram)
         }
@@ -301,7 +275,6 @@ class MileageViewModel {
         remoteChangeWorkItem?.cancel()
     }
     
-    /// 集中式儲存方法，取代所有 try? context.save()
     func saveContext() {
         guard let context = modelContext else { return }
         do {
@@ -321,7 +294,6 @@ class MileageViewModel {
         isInitialLoad = false
         knownDataFingerprint = fetchDataFingerprint()
         
-        // 監聯 CloudKit 遠端變更通知（儲存 token 以便 deinit 清理）
         remoteChangeObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name.NSPersistentStoreRemoteChange,
             object: nil,
@@ -331,18 +303,13 @@ class MileageViewModel {
         }
     }
     
-    /// 收到遠端變更通知時，防抖後檢查是否有實際資料變更再刷新
     private func handleRemoteChange() {
-        // 防抖：連續收到多個通知時，只處理最後一次（1 秒內合併）
         remoteChangeWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
             guard let self, let context = self.modelContext else { return }
             context.rollback()
             
-            // 重新載入計劃列表，處理從遠端同步過來的新計劃或重複計劃
             self.loadPrograms()
-            
-            // 嘗試將未綁定計劃的資料自動綁定到當前計劃
             self.migrateOrphanedDataToActiveProgram()
             
             let newFingerprint = self.fetchDataFingerprint()
@@ -355,12 +322,10 @@ class MileageViewModel {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
     }
     
-    /// 用戶確認同步後，刷新 UI
     func acknowledgeRemoteChanges() {
         manualSyncNow()
     }
 
-    /// 手動同步：重置快取並重新讀取本地 store（含已匯入的 CloudKit 變更）
     func manualSyncNow() {
         modelContext?.rollback()
         loadPrograms()
@@ -370,7 +335,6 @@ class MileageViewModel {
         hasRemoteChanges = false
     }
     
-    /// App 回到前台時呼叫，重置快取後檢查是否有新資料
     func checkForRemoteChanges() {
         modelContext?.rollback()
         loadPrograms()
@@ -433,7 +397,6 @@ class MileageViewModel {
         
         let activePID = activeProgram?.id
         
-        // 載入哩程帳戶（篩選當前計劃，選擇哩程最高的帳戶）
         let accountDescriptor = FetchDescriptor<MileageAccount>()
         let allAccounts = (try? context.fetch(accountDescriptor)) ?? []
         let programAccounts = allAccounts.filter { $0.programID == activePID }
@@ -444,7 +407,6 @@ class MileageViewModel {
             self.transactions = (account.transactions ?? []).sorted { $0.date > $1.date }
             self.flightGoals = account.flightGoals ?? []
         } else if isInitialLoad {
-            // 只有首次載入且確定無帳戶時才建立新帳戶
             let newAccount = MileageAccount()
             newAccount.programID = activePID
             context.insert(newAccount)
@@ -455,7 +417,6 @@ class MileageViewModel {
         // 載入信用卡：從 store 讀取用戶偏好後，以程式碼定義重建標準卡片
         rebuildCreditCards()
 
-        // 載入兌換成功紀錄（篩選當前計劃，最新在前）
         let redeemedDescriptor = FetchDescriptor<RedeemedTicket>(
             sortBy: [SortDescriptor(\RedeemedTicket.redeemedDate, order: .reverse)]
         )
@@ -463,15 +424,16 @@ class MileageViewModel {
         self.redeemedTickets = allTickets.filter { $0.programID == activePID }
         
         let programName = activeProgram?.name ?? "未知"
-        let activeCards = creditCards.filter { $0.isActive }.map { $0.cardName }.joined(separator: ", ")
-        appLog("[Sync] loadData 完成 [\(programName)]: 哩程=\(mileageAccount?.totalMiles ?? -1), 交易=\(transactions.count)筆, 目標=\(flightGoals.count)個, 機票=\(redeemedTickets.count)張, 已啟用卡片: [\(activeCards.isEmpty ? "無" : activeCards)]")
+        let activeCardNames = creditCards.filter { $0.isActive }.map { $0.cardName }.joined(separator: ", ")
+        appLog("[Sync] loadData 完成 [\(programName)]: 哩程=\(mileageAccount?.totalMiles ?? -1), 交易=\(transactions.count)筆, 目標=\(flightGoals.count)個, 機票=\(redeemedTickets.count)張, 已啟用卡片: [\(activeCardNames.isEmpty ? "無" : activeCardNames)]")
     }
     
     /// 信用卡規則以程式碼為準，用戶偏好（isActive / tier）透過 SwiftData CardPreference 同步。
+    /// 通用版：遍歷 CardBrandRegistry.allDefinitions 建立卡片。
     private func rebuildCreditCards() {
         guard let context = modelContext else { return }
         
-        // 從 SwiftData 讀取 CardPreference（可透過 CloudKit 同步）
+        // 從 SwiftData 讀取 CardPreference
         let prefs = (try? context.fetch(FetchDescriptor<CardPreference>())) ?? []
         
         // CloudKit 不支援 unique constraints，手動清除重複記錄
@@ -481,39 +443,41 @@ class MileageViewModel {
         }
         let dedupedPrefs = grouped.compactMapValues(\.first).values
         
-        let cathayPref = dedupedPrefs.first { $0.cardBrandRaw == CardBrand.cathayUnitedBank.rawValue }
-        let taishinPref = dedupedPrefs.first { $0.cardBrandRaw == CardBrand.taishinCathay.rawValue }
+        var cards: [CreditCardRule] = []
+        var needsSave = false
         
-        // 決定偏好值（優先使用 SwiftData，再 fallback 舊 UserDefaults，最後用預設值）
-        let cathayActive = cathayPref?.isActive
-            ?? (UserDefaults.standard.object(forKey: "card_cathay_active") as? Bool)
-            ?? true
-        let cathayTier = cathayPref?.cathayTier
-            ?? CathayCardTier(rawValue: UserDefaults.standard.string(forKey: "card_cathay_tier") ?? "")
-            ?? .world
-        let taishinActive = taishinPref?.isActive
-            ?? (UserDefaults.standard.object(forKey: "card_taishin_active") as? Bool)
-            ?? false
-        
-        // 從程式碼建立標準的 2 張卡，套用用戶偏好（純 in-memory，不存 SwiftData）
-        let cathayCard = CreditCardRule.cathayCard(tier: cathayTier)
-        cathayCard.isActive = cathayActive
-        
-        let taishinCard = CreditCardRule.taishinCathayCard()
-        taishinCard.isActive = taishinActive
-        
-        self.creditCards = [cathayCard, taishinCard]
-        
-        // 確保 CardPreference 記錄存在（首次執行或從舊版遷移時建立）
-        if cathayPref == nil {
-            let newPref = CardPreference(cardBrand: .cathayUnitedBank, isActive: cathayActive, tier: cathayTier)
-            context.insert(newPref)
+        for def in CardBrandRegistry.allDefinitions {
+            let pref = dedupedPrefs.first { $0.cardBrandRaw == def.brandID.rawValue }
+            
+            // 決定偏好值（優先使用 SwiftData，再 fallback 舊 UserDefaults，最後用預設值）
+            let udActiveKey = "card_\(def.brandID.rawValue)_active"
+            let udTierKey = "card_\(def.brandID.rawValue)_tier"
+            
+            let isActive = pref?.isActive
+                ?? (UserDefaults.standard.object(forKey: udActiveKey) as? Bool)
+                ?? def.defaultIsActive
+            
+            let tierID = {
+                if let raw = pref?.tierRaw, !raw.isEmpty, def.tier(for: raw) != nil { return raw }
+                if let raw = UserDefaults.standard.string(forKey: udTierKey), def.tier(for: raw) != nil { return raw }
+                return def.defaultTierID
+            }()
+            
+            let card = def.makeCard(tierID: tierID)
+            card.isActive = isActive
+            cards.append(card)
+            
+            // 確保 CardPreference 記錄存在
+            if pref == nil {
+                let newPref = CardPreference(cardBrand: def.brandID, isActive: isActive, tierID: tierID)
+                context.insert(newPref)
+                needsSave = true
+            }
         }
-        if taishinPref == nil {
-            let newPref = CardPreference(cardBrand: .taishinCathay, isActive: taishinActive)
-            context.insert(newPref)
-        }
-        if cathayPref == nil || taishinPref == nil {
+        
+        self.creditCards = cards
+        
+        if needsSave {
             try? context.save()
         }
         
@@ -535,13 +499,12 @@ class MileageViewModel {
         for card in creditCards {
             if let pref = prefs.first(where: { $0.cardBrandRaw == card.cardBrandRaw }) {
                 pref.isActive = card.isActive
-                pref.tierRaw = card.cathayTier?.rawValue ?? ""
+                pref.tierRaw = card.cardTierRaw
             } else {
-                // 正常不應該走到這裡，但保險起見補建
                 let newPref = CardPreference(
                     cardBrand: card.cardBrand,
                     isActive: card.isActive,
-                    tier: card.cathayTier
+                    tierID: card.cardTierRaw
                 )
                 context.insert(newPref)
             }
@@ -549,11 +512,11 @@ class MileageViewModel {
         saveContext()
     }
     
-    // 新增交易
+    // 新增交易（通用版 — 使用 subcategoryID）
     func addTransaction(amount: Decimal,
                        earnedMiles: Int,
                        source: MileageSource,
-                       acceleratorCategory: AcceleratorCategory? = nil,
+                       subcategoryID: String? = nil,
                        date: Date = Date(),
                        notes: String = "",
                        flightRoute: String? = nil,
@@ -562,13 +525,12 @@ class MileageViewModel {
                        promotionName: String? = nil) {
         guard let context = modelContext, let account = mileageAccount else { return }
         
-        // 創建交易記錄
         let transaction = Transaction(
             date: date,
             amount: amount,
             earnedMiles: earnedMiles,
             source: source,
-            acceleratorCategory: acceleratorCategory,
+            subcategoryID: subcategoryID,
             notes: notes,
             flightRoute: flightRoute,
             conversionSource: conversionSource,
@@ -586,17 +548,17 @@ class MileageViewModel {
         loadData()
     }
     
-    // 計算即時預覽哩程（使用信用卡規則）
+    // 計算即時預覽哩程
     func previewMiles(amount: Decimal,
                      source: MileageSource,
-                     acceleratorCategory: AcceleratorCategory? = nil,
+                     subcategoryID: String? = nil,
                      cardRule: CreditCardRule,
                      date: Date = Date()) -> Int {
         let isBirthdayMonth = Calendar.current.isDate(date, equalTo: userBirthday, toGranularity: .month)
         return cardRule.calculateMiles(
             amount: amount,
             source: source,
-            acceleratorCategory: acceleratorCategory,
+            subcategoryID: subcategoryID,
             isBirthdayMonth: isBirthdayMonth
         )
     }
@@ -610,7 +572,6 @@ class MileageViewModel {
     func addFlightGoal(_ goal: FlightGoal) {
         guard let context = modelContext, let account = mileageAccount else { return }
         
-        // 自動設定 sortOrder 為同群組的最後一位
         let sameGroup = flightGoals.filter { $0.isPriority == goal.isPriority }
         let maxOrder = sameGroup.map { $0.sortOrder }.max() ?? -1
         goal.sortOrder = maxOrder + 1
@@ -683,7 +644,6 @@ class MileageViewModel {
         account.transactions?.append(transaction)
         account.updateMiles(amount: -goal.requiredMiles, date: redeemedDate)
 
-        // 雙向連結
         ticket.linkedTransactionID = transaction.id
 
         deleteFlightGoal(goal)
@@ -691,12 +651,12 @@ class MileageViewModel {
         loadData()
     }
     
-    // 更新交易
+    // 更新交易（通用版）
     func updateTransaction(_ transaction: Transaction,
                            amount: Decimal,
                            earnedMiles: Int,
                            source: MileageSource,
-                           acceleratorCategory: AcceleratorCategory? = nil,
+                           subcategoryID: String? = nil,
                            date: Date,
                            notes: String = "",
                            flightRoute: String? = nil,
@@ -705,23 +665,20 @@ class MileageViewModel {
                            promotionName: String? = nil) {
         guard let account = mileageAccount else { return }
         
-        // 先扣掉舊的哩程，再加上新的
         let milesDiff = earnedMiles - transaction.earnedMiles
         account.updateMiles(amount: milesDiff, date: date)
         
-        // 更新交易屬性
         transaction.date = date
         transaction.amount = amount
         transaction.earnedMiles = earnedMiles
         transaction.source = source
-        transaction.acceleratorCategory = acceleratorCategory
+        transaction.resolvedSubcategoryID = subcategoryID
         transaction.notes = notes
         transaction.flightRoute = flightRoute
         transaction.conversionSource = conversionSource
         transaction.merchantName = merchantName
         transaction.promotionName = promotionName
         
-        // 重新計算每哩成本
         if earnedMiles > 0 {
             transaction.costPerMile = Double(truncating: amount as NSDecimalNumber) / Double(earnedMiles)
         } else {
@@ -736,21 +693,17 @@ class MileageViewModel {
     func deleteTransaction(_ transaction: Transaction) {
         guard let context = modelContext, let account = mileageAccount else { return }
         
-        // 如果有連結的兌換紀錄，一併刪除
         if let ticketID = transaction.linkedTicketID,
            let ticket = redeemedTickets.first(where: { $0.id == ticketID }) {
             context.delete(ticket)
         }
         
-        // 從哩程帳戶減去該交易的哩程
         account.updateMiles(amount: -transaction.earnedMiles, date: transaction.date)
         
-        // 從陣列中移除
         if let index = account.transactions?.firstIndex(where: { $0.id == transaction.id }) {
             account.transactions?.remove(at: index)
         }
         
-        // 從資料庫刪除
         context.delete(transaction)
         saveContext()
         loadData()
@@ -760,7 +713,6 @@ class MileageViewModel {
     func deleteRedeemedTicket(_ ticket: RedeemedTicket) {
         guard let context = modelContext, let account = mileageAccount else { return }
 
-        // 優先使用雙向連結刪除；若舊資料沒有連結，再嘗試依特徵比對扣點交易
         var linkedTransaction: Transaction?
         if let txID = ticket.linkedTransactionID {
             linkedTransaction = transactions.first(where: { $0.id == txID })
@@ -839,12 +791,11 @@ class MileageViewModel {
         saveCardPreferences()
     }
     
-    // 切換國泰卡等級
-    func updateCardTier(_ card: CreditCardRule, tier: CathayCardTier) {
-        card.updateTier(tier)
+    // 通用切換卡片等級
+    func updateCardTier(_ card: CreditCardRule, tierID: String) {
+        card.updateTier(tierID)
         saveCardPreferences()
     }
-    
     
     // 取得本月交易統計
     func monthlyStats() -> (totalAmount: Decimal, totalMiles: Int) {
@@ -855,7 +806,6 @@ class MileageViewModel {
             calendar.isDate($0.date, equalTo: now, toGranularity: .month)
         }
         
-        // 兌換機票的附加稅不計入「本月消費」
         let totalAmount = monthTransactions
             .filter { $0.source != .ticketRedemption }
             .reduce(Decimal(0)) { $0 + $1.amount }

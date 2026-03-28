@@ -39,114 +39,40 @@ struct CreditCardCell: View {
     let card: CreditCardRule
     @Bindable var viewModel: MileageViewModel
     let colorScheme: ColorScheme
-    @State private var showingAcceleratorInfo = false
+    @State private var showingCategoryInfo = false
+    
+    /// 從 Registry 取得品牌定義
+    var brandDef: CardBrandDefinition? {
+        card.brandDefinition
+    }
+    
+    /// 從 Registry 取得等級定義
+    var tierDef: CardTierDefinition? {
+        card.tierDefinition
+    }
     
     var cardGradient: LinearGradient {
-        switch card.cardBrand {
-        case .cathayUnitedBank:
-            if let tier = card.cathayTier {
-                switch tier {
-                case .world:
-                    return LinearGradient(colors: [Color(red: 0.12, green: 0.12, blue: 0.14), Color(red: 0.28, green: 0.28, blue: 0.32)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                case .titanium:
-                    return LinearGradient(colors: [Color(red: 0.38, green: 0.38, blue: 0.42), Color(red: 0.58, green: 0.58, blue: 0.62)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                case .platinum:
-                    return LinearGradient(colors: [Color(red: 0.0, green: 0.18, blue: 0.38), Color(red: 0.18, green: 0.45, blue: 0.68)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                case .miles:
-                    return LinearGradient(colors: [Color(red: 0.38, green: 0.08, blue: 0.28), Color(red: 0.75, green: 0.28, blue: 0.48)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                }
-            }
-            return LinearGradient(colors: [Color(red: 0.12, green: 0.12, blue: 0.14), Color(red: 0.28, green: 0.28, blue: 0.32)], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .taishinCathay:
-            return LinearGradient(colors: [Color(red: 0.05, green: 0.25, blue: 0.15), Color(red: 0.15, green: 0.5, blue: 0.35)], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
+        let colors = tierDef?.gradient ?? [Color.gray, Color.gray.opacity(0.6)]
+        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // MARK: 卡面視覺
-            Group {
-                if card.cardBrand == .cathayUnitedBank, let tier = card.cathayTier {
-                    // 國泰卡：使用實際卡片圖片
-                    Image(tier.cardImageName)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md))
-                        .shadow(color: .black.opacity(0.25), radius: 6, x: 0, y: 3)
-                } else {
-                    // 台新卡或其他：使用漸層卡面
-                    ZStack(alignment: .topLeading) {
-                        RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
-                            .fill(cardGradient)
-                            .frame(height: 180)
-                            .shadow(color: .black.opacity(0.25), radius: 6, x: 0, y: 3)
-                        
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: "creditcard.fill")
-                                    .font(.title2)
-                                Spacer()
-                                Image(systemName: "airplane.circle.fill")
-                                    .font(.title2)
-                            }
-                            
-                            Spacer()
-                            
-                            Text(card.bankName)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .opacity(0.8)
-                            
-                            Text(card.cardName)
-                                .font(.title3)
-                                .fontWeight(.bold)
-                        }
-                        .foregroundStyle(.white)
-                        .padding(AviationTheme.Spacing.lg)
-                    }
-                }
-            }
-            .padding(.horizontal, AviationTheme.Spacing.md)
-            .padding(.top, AviationTheme.Spacing.md)
-            
-            // MARK: 等級選擇（僅國泰卡）
-            if card.cardBrand == .cathayUnitedBank {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("卡片等級")
-                        .font(AviationTheme.Typography.caption)
-                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                    
-                    Picker("等級", selection: Binding(
-                        get: { card.cathayTier ?? .world },
-                        set: { newTier in
-                            viewModel.updateCardTier(card, tier: newTier)
-                        }
-                    )) {
-                        ForEach(CathayCardTier.allCases, id: \.self) { tier in
-                            Text(tier.rawValue).tag(tier)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
+            cardVisual
                 .padding(.horizontal, AviationTheme.Spacing.md)
                 .padding(.top, AviationTheme.Spacing.md)
+            
+            // MARK: 等級選擇（通用）
+            if let def = brandDef, def.tiers.count > 1 {
+                tierPicker(definition: def)
+                    .padding(.horizontal, AviationTheme.Spacing.md)
+                    .padding(.top, AviationTheme.Spacing.md)
             }
             
-            // MARK: 費率資訊
-            if card.cardBrand == .taishinCathay {
-                // 台新卡佔位
-                HStack {
-                    Image(systemName: "wrench.and.screwdriver")
-                        .foregroundColor(AviationTheme.Colors.warning)
-                    Text("計算規則開發中，敬請期待")
-                        .font(AviationTheme.Typography.subheadline)
-                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, AviationTheme.Spacing.lg)
-                .padding(.horizontal, AviationTheme.Spacing.md)
-            } else {
-                rateInfoSection
+            // MARK: 費率資訊（通用）
+            if let def = brandDef {
+                rateInfoSection(definition: def)
             }
             
             Divider()
@@ -154,43 +80,7 @@ struct CreditCardCell: View {
                 .padding(.horizontal, AviationTheme.Spacing.md)
             
             // MARK: 啟用開關
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    if card.isActive {
-                        HStack(spacing: 4) {
-                            Text("已啟用")
-                                .font(AviationTheme.Typography.body)
-                                .fontWeight(.medium)
-                                .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
-                            if let tier = card.cathayTier {
-                                Text("：\(tier.rawValue)")
-                                    .font(AviationTheme.Typography.body)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(AviationTheme.Colors.cathayJade)
-                            }
-                        }
-                    } else {
-                        Text("已停用")
-                            .font(AviationTheme.Typography.body)
-                            .fontWeight(.medium)
-                            .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                    }
-                    Text("啟用後可在計算機中選擇此卡")
-                        .font(AviationTheme.Typography.caption)
-                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                }
-                
-                Spacer()
-                
-                Toggle("", isOn: Binding(
-                    get: { card.isActive },
-                    set: { _ in viewModel.toggleCardActive(card) }
-                ))
-                .labelsHidden()
-                .tint(AviationTheme.Colors.cathayJade)
-            }
-            .padding(.horizontal, AviationTheme.Spacing.md)
-            .padding(.vertical, AviationTheme.Spacing.md)
+            toggleSection
         }
         .background(AviationTheme.Colors.cardBackground(colorScheme))
         .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
@@ -201,60 +91,210 @@ struct CreditCardCell: View {
         )
     }
     
-    // MARK: - 費率資訊區
-    private var rateInfoSection: some View {
+    // MARK: - 卡面視覺
+    @ViewBuilder
+    private var cardVisual: some View {
+        if let def = brandDef, def.usesCardImage, let imageName = tierDef?.cardImageName {
+            // 使用實際卡片圖片
+            Image(imageName)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md))
+                .shadow(color: .black.opacity(0.25), radius: 6, x: 0, y: 3)
+        } else {
+            // 使用漸層色卡面
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
+                    .fill(cardGradient)
+                    .frame(height: 180)
+                    .shadow(color: .black.opacity(0.25), radius: 6, x: 0, y: 3)
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "creditcard.fill")
+                            .font(.title2)
+                        Spacer()
+                        Image(systemName: "airplane.circle.fill")
+                            .font(.title2)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(card.bankName)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .opacity(0.8)
+                    
+                    Text(card.cardName)
+                        .font(.title3)
+                        .fontWeight(.bold)
+                }
+                .foregroundStyle(.white)
+                .padding(AviationTheme.Spacing.lg)
+            }
+        }
+    }
+    
+    // MARK: - 等級選擇器（通用）
+    private func tierPicker(definition: CardBrandDefinition) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("卡片等級")
+                .font(AviationTheme.Typography.caption)
+                .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+            
+            Picker("等級", selection: Binding(
+                get: { card.cardTierRaw },
+                set: { newTierID in
+                    viewModel.updateCardTier(card, tierID: newTierID)
+                }
+            )) {
+                ForEach(definition.tiers) { tier in
+                    Text(tier.id).tag(tier.id)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+    }
+    
+    // MARK: - 費率資訊（通用）
+    private func rateInfoSection(definition: CardBrandDefinition) -> some View {
         VStack(spacing: 12) {
-            HStack(spacing: 0) {
-                rateColumn(title: "一般消費", value: "\(card.baseRate.formatted()) 元/哩", highlight: false)
-                
-                Divider()
-                    .background(AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.3))
-                    .frame(height: 40)
-                
-                // 加速消費 + info icon
-                VStack(spacing: 4) {
-                    HStack(spacing: 4) {
-                        Text("加速消費")
-                            .font(AviationTheme.Typography.caption)
-                            .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                        
-                        Button {
-                            showingAcceleratorInfo = true
-                        } label: {
-                            Image(systemName: "info.circle")
-                                .font(.caption2)
-                                .foregroundColor(AviationTheme.Colors.cathayJade)
+            // 費率欄位
+            let slots = definition.rateSlots
+            let rateSlots = slots.filter { !$0.isAnnualFee }
+            let feeSlots = slots.filter { $0.isAnnualFee }
+            
+            if !rateSlots.isEmpty {
+                HStack(spacing: 0) {
+                    ForEach(Array(rateSlots.enumerated()), id: \.offset) { index, slot in
+                        if slot.showInfoButton, let mapping = slot.infoSourceMapping {
+                            // 帶 info 按鈕的費率欄位
+                            VStack(spacing: 4) {
+                                HStack(spacing: 4) {
+                                    Text(slot.title)
+                                        .font(AviationTheme.Typography.caption)
+                                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                                    
+                                    Button {
+                                        showingCategoryInfo = true
+                                    } label: {
+                                        Image(systemName: "info.circle")
+                                            .font(.caption2)
+                                            .foregroundColor(AviationTheme.Colors.cathayJade)
+                                    }
+                                    .popover(isPresented: $showingCategoryInfo) {
+                                        CategoryInfoPopover(mapping: mapping, colorScheme: colorScheme)
+                                            .presentationCompactAdaptation(.popover)
+                                    }
+                                }
+                                Text("\(rateValue(for: slot).formatted()) 元/哩")
+                                    .font(AviationTheme.Typography.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(AviationTheme.Colors.warning)
+                            }
+                            .frame(maxWidth: .infinity)
+                        } else {
+                            rateColumn(title: slot.title, value: "\(rateValue(for: slot).formatted()) 元/哩", highlight: false)
                         }
-                        .popover(isPresented: $showingAcceleratorInfo) {
-                            AcceleratorInfoPopover(colorScheme: colorScheme)
-                                .presentationCompactAdaptation(.popover)
+                        
+                        if index < rateSlots.count - 1 {
+                            Divider()
+                                .background(AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.3))
+                                .frame(height: 40)
                         }
                     }
-                    Text("\(card.acceleratorRate.formatted()) 元/哩")
-                        .font(AviationTheme.Typography.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(AviationTheme.Colors.warning)
                 }
-                .frame(maxWidth: .infinity)
-                
-                Divider()
-                    .background(AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.3))
-                    .frame(height: 40)
-                
-                rateColumn(title: "年費", value: "NT$ \(card.annualFee.formatted())", highlight: false)
             }
             
-            if let tier = card.cathayTier, tier.annualCap > 0 {
+            // 年費欄位（如果有的話，跟費率放在一起）
+            if !feeSlots.isEmpty {
+                if !rateSlots.isEmpty {
+                    // 如果費率欄位有 3 個以上，年費放下一行
+                    if rateSlots.count >= 3 {
+                        HStack(spacing: 0) {
+                            rateColumn(title: "年費", value: "NT$ \(card.annualFee.formatted())", highlight: false)
+                        }
+                    } else {
+                        // 否則加在費率欄位的最後面（已在上面的 HStack 裡處理）
+                        // 但因為 feeSlots 是分開的，這裡加一個分隔的年費行
+                    }
+                }
+            }
+            
+            // 如果費率欄位少於 3 個，年費跟費率放同一行（重新渲染整個 HStack）
+            // 簡化：年費一律放在費率下方（跟台新一致）
+            if !feeSlots.isEmpty && rateSlots.count < 3 {
+                HStack(spacing: 0) {
+                    Divider()
+                        .background(AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.3))
+                        .frame(height: 40)
+                        .hidden()
+                    rateColumn(title: "年費", value: "NT$ \(card.annualFee.formatted())", highlight: false)
+                }
+            }
+            
+            // 年度加速上限提示
+            if let tier = tierDef, tier.rates.annualCap > 0 {
                 HStack(spacing: 6) {
                     Image(systemName: "info.circle")
                         .font(.caption2)
                         .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
-                    Text("年度加速上限 \(tier.annualCap.formatted()) 哩")
+                    Text("年度加速上限 \(tier.rates.annualCap.formatted()) 哩")
                         .font(AviationTheme.Typography.caption)
                         .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+        }
+        .padding(.horizontal, AviationTheme.Spacing.md)
+        .padding(.vertical, AviationTheme.Spacing.md)
+    }
+    
+    /// 根據 slot 的 rateKeyPath 取得對應費率
+    private func rateValue(for slot: CardRateSlot) -> Decimal {
+        switch slot.rateKeyPath {
+        case .base: return card.baseRate
+        case .secondary: return card.acceleratorRate
+        case .tertiary: return card.specialMerchantRate
+        }
+    }
+    
+    // MARK: - 啟用開關
+    private var toggleSection: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                if card.isActive {
+                    HStack(spacing: 4) {
+                        Text("已啟用")
+                            .font(AviationTheme.Typography.body)
+                            .fontWeight(.medium)
+                            .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                        if !card.cardTierRaw.isEmpty {
+                            Text("：\(card.cardTierRaw)")
+                                .font(AviationTheme.Typography.body)
+                                .fontWeight(.medium)
+                                .foregroundColor(AviationTheme.Colors.cathayJade)
+                        }
+                    }
+                } else {
+                    Text("已停用")
+                        .font(AviationTheme.Typography.body)
+                        .fontWeight(.medium)
+                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                }
+                Text("啟用後可在計算機中選擇此卡")
+                    .font(AviationTheme.Typography.caption)
+                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+            }
+            
+            Spacer()
+            
+            Toggle("", isOn: Binding(
+                get: { card.isActive },
+                set: { _ in viewModel.toggleCardActive(card) }
+            ))
+            .labelsHidden()
+            .tint(AviationTheme.Colors.cathayJade)
         }
         .padding(.horizontal, AviationTheme.Spacing.md)
         .padding(.vertical, AviationTheme.Spacing.md)
@@ -274,21 +314,22 @@ struct CreditCardCell: View {
     }
 }
 
-// MARK: - 加速器特店說明 Popover
-struct AcceleratorInfoPopover: View {
+// MARK: - 通用子類別說明 Popover（取代 AcceleratorInfoPopover + TaishinDesignatedInfoPopover）
+struct CategoryInfoPopover: View {
+    let mapping: CardMileageSourceMapping
     let colorScheme: ColorScheme
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("四大哩程加速器")
+            Text(mapping.infoPopoverTitle)
                 .font(AviationTheme.Typography.headline)
                 .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
             
-            Text("以下類別消費可享加速哩程回饋")
+            Text(mapping.infoPopoverSubtitle)
                 .font(AviationTheme.Typography.caption)
                 .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
             
-            ForEach(AcceleratorCategory.allCases, id: \.self) { category in
+            ForEach(mapping.subcategories) { category in
                 HStack(spacing: 10) {
                     Image(systemName: category.icon)
                         .font(.subheadline)
@@ -296,11 +337,11 @@ struct AcceleratorInfoPopover: View {
                         .frame(width: 24)
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(category.rawValue)
+                        Text(category.id)
                             .font(AviationTheme.Typography.subheadline)
                             .fontWeight(.medium)
                             .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
-                        Text(category.acceleratorDescription)
+                        Text(category.description)
                             .font(AviationTheme.Typography.caption)
                             .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
                     }
