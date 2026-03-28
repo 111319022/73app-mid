@@ -536,7 +536,9 @@ struct GoalProgressCard: View {
                 .padding(.trailing, 36)
 
                 Button {
-                    let screenHeight = UIScreen.main.bounds.height
+                    let screenHeight = UIApplication.shared.connectedScenes
+                        .compactMap { $0 as? UIWindowScene }
+                        .first?.screen.bounds.height ?? 800
                     let estimatedMenuHeight: CGFloat = 190
                     let availableBelow = screenHeight - actionButtonFrame.maxY
                     actionPopoverEdge = availableBelow < estimatedMenuHeight ? .bottom : .top

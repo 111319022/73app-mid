@@ -53,8 +53,7 @@ final class DeveloperAccessService {
             }
 
             guard allowedHashes.contains(userHash) else {
-                let preview = allowedHashes.prefix(3).joined(separator: "\n")
-                return .denied("您目前不在白名單內。\n請提供以下識別碼給管理者加入白名單：\n\(userHash)\n\n目前白名單筆數：\(allowedHashes.count)")
+                return .denied("你目前不在白名單內。\n請提供以下識別碼給管理者加入白名單：\n\(userHash)\n\n目前白名單筆數：\(allowedHashes.count)")
             }
 
             return .allowed
