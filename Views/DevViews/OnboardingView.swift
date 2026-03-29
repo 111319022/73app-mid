@@ -14,14 +14,30 @@ struct OnboardingView: View {
     // Page 3: 信用卡選擇
     @State private var selectedCathayTierID: String? = nil
     @State private var enableTaishinCard = false
+    @State private var hasNoCard = false
     
     private let cathayDefinition = CathayUnitedBankCard()
     private let taishinDefinition = TaishinCathayCard()
     
-    // Page 4: Cloudkit同步設定
+    // Page 4: 常用出發地
+    @AppStorage("preferredOrigin") private var preferredOrigin: String = ""
+    @State private var showingAirportPicker = false
+    @State private var selectedAirport: Airport? = nil
+    
+    // Page 5: 現有里程輸入
+    @State private var existingMilesText: String = ""
+    
+    // Page 6: 生日選擇
+    @State private var enableBirthday = true
+    @State private var selectedBirthdayMonth: Int = Calendar.current.component(.month, from: Date())
+    
+    // Page 7: 主題選擇
+    @AppStorage("userColorScheme") private var userColorScheme: String = "system"
+    
+    // Page 8: CloudKit同步設定
     @AppStorage("cloudKitSyncEnabled") private var cloudKitSyncEnabled: Bool = true
     
-    private let totalPages = 4
+    private let totalPages = 8
     
     var body: some View {
         ZStack {
@@ -30,13 +46,13 @@ struct OnboardingView: View {
             
             VStack(spacing: 0) {
                 // Page indicator
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     ForEach(0..<totalPages, id: \.self) { index in
                         Capsule()
                             .fill(index == currentPage
                                   ? AviationTheme.Colors.cathayJade
                                   : AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.3))
-                            .frame(width: index == currentPage ? 24 : 8, height: 8)
+                            .frame(width: index == currentPage ? 20 : 6, height: 6)
                             .animation(.spring(duration: 0.3), value: currentPage)
                     }
                 }
@@ -48,7 +64,11 @@ struct OnboardingView: View {
                     welcomePage.tag(0)
                     programPage.tag(1)
                     creditCardPage.tag(2)
-                    iCloudPage.tag(3)
+                    departurePage.tag(3)
+                    existingMilesPage.tag(4)
+                    birthdayPage.tag(5)
+                    themePage.tag(6)
+                    iCloudPage.tag(7)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.3), value: currentPage)
@@ -67,6 +87,20 @@ struct OnboardingView: View {
                 }
                 .foregroundColor(AviationTheme.Colors.cathayJade)
             }
+        }
+        .sheet(isPresented: $showingAirportPicker) {
+            AirportPickerView(
+                selectedAirport: Binding(
+                    get: { selectedAirport },
+                    set: { newValue in
+                        selectedAirport = newValue
+                        if let airport = newValue {
+                            preferredOrigin = airport.iataCode
+                        }
+                    }
+                ),
+                airports: AirportDatabase.shared.getAllAirports()
+            )
         }
     }
     
@@ -224,36 +258,95 @@ struct OnboardingView: View {
                         .multilineTextAlignment(.center)
                 }
                 
-                // Cathay United Bank card
-                VStack(alignment: .leading, spacing: AviationTheme.Spacing.sm) {
-                    Text("國泰世華亞萬聯名卡")
-                        .font(AviationTheme.Typography.headline)
-                        .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
-                        .padding(.leading, 4)
-                    
-                    VStack(spacing: AviationTheme.Spacing.sm) {
-                        ForEach(cathayDefinition.tiers) { tier in
-                            cathayTierCard(tier)
+                // 我沒有相關信用卡
+                noCardOption
+                
+                if !hasNoCard {
+                    // Cathay United Bank card
+                    VStack(alignment: .leading, spacing: AviationTheme.Spacing.sm) {
+                        Text("國泰世華亞萬聯名卡")
+                            .font(AviationTheme.Typography.headline)
+                            .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                            .padding(.leading, 4)
+                        
+                        VStack(spacing: AviationTheme.Spacing.sm) {
+                            ForEach(cathayDefinition.tiers) { tier in
+                                cathayTierCard(tier)
+                            }
                         }
                     }
-                }
-                .padding(.horizontal, AviationTheme.Spacing.md)
-                
-                // Taishin card
-                VStack(alignment: .leading, spacing: AviationTheme.Spacing.sm) {
-                    Text("台新國泰航空聯名卡")
-                        .font(AviationTheme.Typography.headline)
-                        .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
-                        .padding(.leading, 4)
+                    .padding(.horizontal, AviationTheme.Spacing.md)
                     
-                    taishinCard
+                    // Taishin card
+                    VStack(alignment: .leading, spacing: AviationTheme.Spacing.sm) {
+                        Text("台新國泰航空聯名卡")
+                            .font(AviationTheme.Typography.headline)
+                            .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                            .padding(.leading, 4)
+                        
+                        taishinCard
+                    }
+                    .padding(.horizontal, AviationTheme.Spacing.md)
                 }
-                .padding(.horizontal, AviationTheme.Spacing.md)
                 
                 Spacer().frame(height: AviationTheme.Spacing.xxl)
             }
             .padding(.horizontal, AviationTheme.Spacing.md)
         }
+    }
+    
+    private var noCardOption: some View {
+        Button {
+            withAnimation(.spring(duration: 0.25)) {
+                hasNoCard.toggle()
+                if hasNoCard {
+                    selectedCathayTierID = nil
+                    enableTaishinCard = false
+                }
+            }
+        } label: {
+            HStack(spacing: 16) {
+                Image(systemName: "hand.raised.fill")
+                    .font(.title2)
+                    .foregroundColor(hasNoCard
+                                    ? AviationTheme.Colors.cathayJade
+                                    : AviationTheme.Colors.secondaryText(colorScheme))
+                    .frame(width: 36)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("我沒有相關信用卡")
+                        .font(AviationTheme.Typography.headline)
+                        .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                    
+                    Text("跳過信用卡設定，之後可在設定中新增")
+                        .font(AviationTheme.Typography.caption)
+                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                }
+                
+                Spacer()
+                
+                Image(systemName: hasNoCard
+                      ? "checkmark.circle.fill"
+                      : "circle")
+                    .font(.title3)
+                    .foregroundColor(hasNoCard
+                                    ? AviationTheme.Colors.cathayJade
+                                    : AviationTheme.Colors.tertiaryText(colorScheme))
+            }
+            .padding(AviationTheme.Spacing.md)
+            .background(AviationTheme.Colors.cardBackground(colorScheme))
+            .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
+            .overlay(
+                RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg)
+                    .stroke(hasNoCard
+                            ? AviationTheme.Colors.cathayJade
+                            : Color.clear,
+                            lineWidth: 2)
+            )
+            .shadow(color: AviationTheme.Shadows.cardShadow(colorScheme).opacity(0.5), radius: 6, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, AviationTheme.Spacing.md)
     }
     
     private func cathayTierCard(_ tier: CardTierDefinition) -> some View {
@@ -264,6 +357,7 @@ struct OnboardingView: View {
                     selectedCathayTierID = nil
                 } else {
                     selectedCathayTierID = tier.id
+                    hasNoCard = false
                 }
             }
         } label: {
@@ -315,6 +409,9 @@ struct OnboardingView: View {
         Button {
             withAnimation(.spring(duration: 0.25)) {
                 enableTaishinCard.toggle()
+                if enableTaishinCard {
+                    hasNoCard = false
+                }
             }
         } label: {
             HStack(spacing: 14) {
@@ -366,7 +463,405 @@ struct OnboardingView: View {
         .buttonStyle(.plain)
     }
     
-    // MARK: - Page 4: CloudKit同步設定
+    // MARK: - Page 4: 常用出發地
+    private var departurePage: some View {
+        VStack(spacing: AviationTheme.Spacing.xl) {
+            Spacer()
+            
+            VStack(spacing: AviationTheme.Spacing.sm) {
+                Image(systemName: "mappin.and.ellipse")
+                    .font(.system(size: 48))
+                    .foregroundColor(AviationTheme.Colors.cathayJade)
+                
+                Text("常用出發地")
+                    .font(AviationTheme.Typography.title2)
+                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                
+                Text("設定您最常出發的機場，方便快速建立飛行目標")
+                    .font(AviationTheme.Typography.subheadline)
+                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    .multilineTextAlignment(.center)
+            }
+            
+            Button {
+                showingAirportPicker = true
+            } label: {
+                HStack(spacing: 16) {
+                    Image(systemName: "airplane.departure")
+                        .font(.title2)
+                        .foregroundColor(AviationTheme.Colors.cathayJade)
+                        .frame(width: 36)
+                    
+                    if preferredOrigin.isEmpty {
+                        Text("點擊選擇出發機場")
+                            .font(AviationTheme.Typography.headline)
+                            .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    } else {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(preferredOrigin)
+                                .font(AviationTheme.Typography.title3)
+                                .fontWeight(.bold)
+                                .foregroundColor(AviationTheme.Colors.cathayJade)
+                            
+                            if let airport = AirportDatabase.shared.getAirport(iataCode: preferredOrigin) {
+                                Text(airport.cityName)
+                                    .font(AviationTheme.Typography.subheadline)
+                                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.subheadline)
+                        .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+                }
+                .padding(AviationTheme.Spacing.md)
+                .background(AviationTheme.Colors.cardBackground(colorScheme))
+                .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
+                .overlay(
+                    RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg)
+                        .stroke(!preferredOrigin.isEmpty
+                                ? AviationTheme.Colors.cathayJade
+                                : Color.clear,
+                                lineWidth: 2)
+                )
+                .shadow(color: AviationTheme.Shadows.cardShadow(colorScheme).opacity(0.5), radius: 8, x: 0, y: 2)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, AviationTheme.Spacing.md)
+            
+            Text("此設定之後可在「設定 > 常用出發地」中更改")
+                .font(AviationTheme.Typography.caption)
+                .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+            
+            Spacer()
+            Spacer()
+        }
+        .padding(.horizontal, AviationTheme.Spacing.md)
+    }
+    
+    // MARK: - Page 5: 現有里程輸入
+    private var existingMilesPage: some View {
+        VStack(spacing: AviationTheme.Spacing.xl) {
+            Spacer()
+            
+            VStack(spacing: AviationTheme.Spacing.sm) {
+                Image(systemName: "tray.and.arrow.down.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(AviationTheme.Colors.cathayJade)
+                
+                Text("現有里程")
+                    .font(AviationTheme.Typography.title2)
+                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                
+                Text("如果您已有里程餘額，可以在這裡輸入，\n系統會自動記錄為「初次輸入」")
+                    .font(AviationTheme.Typography.subheadline)
+                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    .multilineTextAlignment(.center)
+            }
+            
+            VStack(spacing: AviationTheme.Spacing.md) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("目前里程餘額")
+                        .font(AviationTheme.Typography.caption)
+                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    
+                    HStack(spacing: 8) {
+                        TextField("0", text: $existingMilesText)
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.center)
+                        
+                        Text("哩")
+                            .font(AviationTheme.Typography.title3)
+                            .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    }
+                    .padding(AviationTheme.Spacing.md)
+                    .background(AviationTheme.Colors.cardBackground(colorScheme))
+                    .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg)
+                            .stroke(AviationTheme.Colors.tertiaryText(colorScheme).opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .padding(.horizontal, AviationTheme.Spacing.md)
+            }
+            
+            Text("不確定的話可以跳過，之後隨時可以手動記帳")
+                .font(AviationTheme.Typography.caption)
+                .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+            
+            Spacer()
+            Spacer()
+        }
+        .padding(.horizontal, AviationTheme.Spacing.md)
+    }
+    
+    // MARK: - Page 6: 生日選擇
+    private var birthdayPage: some View {
+        VStack(spacing: AviationTheme.Spacing.xl) {
+            Spacer()
+            
+            VStack(spacing: AviationTheme.Spacing.sm) {
+                Image(systemName: "gift.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(AviationTheme.Colors.cathayJade)
+                
+                Text("生日月份")
+                    .font(AviationTheme.Typography.title2)
+                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                
+                Text("部分信用卡在生日當月消費可享哩程加倍，\n設定後系統會自動計算加碼")
+                    .font(AviationTheme.Typography.subheadline)
+                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                    .multilineTextAlignment(.center)
+            }
+            
+            VStack(spacing: AviationTheme.Spacing.md) {
+                // 啟用/跳過
+                Button {
+                    withAnimation(.spring(duration: 0.25)) {
+                        enableBirthday = true
+                    }
+                } label: {
+                    HStack(spacing: 16) {
+                        Image(systemName: "calendar.badge.checkmark")
+                            .font(.title2)
+                            .foregroundColor(enableBirthday
+                                            ? AviationTheme.Colors.cathayJade
+                                            : AviationTheme.Colors.secondaryText(colorScheme))
+                            .frame(width: 36)
+                        
+                        Text("設定生日月份")
+                            .font(AviationTheme.Typography.headline)
+                            .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                        
+                        Spacer()
+                        
+                        Image(systemName: enableBirthday
+                              ? "checkmark.circle.fill"
+                              : "circle")
+                            .font(.title3)
+                            .foregroundColor(enableBirthday
+                                            ? AviationTheme.Colors.cathayJade
+                                            : AviationTheme.Colors.tertiaryText(colorScheme))
+                    }
+                    .padding(AviationTheme.Spacing.md)
+                    .background(AviationTheme.Colors.cardBackground(colorScheme))
+                    .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg)
+                            .stroke(enableBirthday
+                                    ? AviationTheme.Colors.cathayJade
+                                    : Color.clear,
+                                    lineWidth: 2)
+                    )
+                    .shadow(color: AviationTheme.Shadows.cardShadow(colorScheme).opacity(0.5), radius: 8, x: 0, y: 2)
+                }
+                .buttonStyle(.plain)
+                
+                // 月份選擇器
+                if enableBirthday {
+                    let columns = [
+                        GridItem(.flexible()),
+                        GridItem(.flexible()),
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ]
+                    
+                    LazyVGrid(columns: columns, spacing: 10) {
+                        ForEach(1...12, id: \.self) { month in
+                            let isSelected = selectedBirthdayMonth == month
+                            Button {
+                                withAnimation(.spring(duration: 0.2)) {
+                                    selectedBirthdayMonth = month
+                                }
+                            } label: {
+                                Text("\(month) 月")
+                                    .font(AviationTheme.Typography.subheadline)
+                                    .fontWeight(isSelected ? .bold : .medium)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
+                                            .fill(isSelected
+                                                  ? AviationTheme.Colors.cathayJade
+                                                  : AviationTheme.Colors.cardBackground(colorScheme))
+                                    )
+                                    .foregroundColor(isSelected ? .white : AviationTheme.Colors.primaryText(colorScheme))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.md)
+                                            .stroke(isSelected ? AviationTheme.Colors.cathayJade : Color.clear, lineWidth: 2)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+                
+                // 不設定
+                Button {
+                    withAnimation(.spring(duration: 0.25)) {
+                        enableBirthday = false
+                    }
+                } label: {
+                    HStack(spacing: 16) {
+                        Image(systemName: "forward.fill")
+                            .font(.title2)
+                            .foregroundColor(!enableBirthday
+                                            ? AviationTheme.Colors.cathayJade
+                                            : AviationTheme.Colors.secondaryText(colorScheme))
+                            .frame(width: 36)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("暫時不設定")
+                                .font(AviationTheme.Typography.headline)
+                                .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                            
+                            Text("不會觸發生日加倍計算")
+                                .font(AviationTheme.Typography.caption)
+                                .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: !enableBirthday
+                              ? "checkmark.circle.fill"
+                              : "circle")
+                            .font(.title3)
+                            .foregroundColor(!enableBirthday
+                                            ? AviationTheme.Colors.cathayJade
+                                            : AviationTheme.Colors.tertiaryText(colorScheme))
+                    }
+                    .padding(AviationTheme.Spacing.md)
+                    .background(AviationTheme.Colors.cardBackground(colorScheme))
+                    .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg)
+                            .stroke(!enableBirthday
+                                    ? AviationTheme.Colors.cathayJade
+                                    : Color.clear,
+                                    lineWidth: 2)
+                    )
+                    .shadow(color: AviationTheme.Shadows.cardShadow(colorScheme).opacity(0.5), radius: 8, x: 0, y: 2)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, AviationTheme.Spacing.md)
+            
+            Spacer()
+        }
+        .padding(.horizontal, AviationTheme.Spacing.md)
+    }
+    
+    // MARK: - Page 7: 主題選擇
+    private var themePage: some View {
+        VStack(spacing: AviationTheme.Spacing.xl) {
+            Spacer()
+            
+            VStack(spacing: AviationTheme.Spacing.sm) {
+                Image(systemName: "paintbrush.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(AviationTheme.Colors.cathayJade)
+                
+                Text("外觀主題")
+                    .font(AviationTheme.Typography.title2)
+                    .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                
+                Text("選擇您偏好的顯示模式")
+                    .font(AviationTheme.Typography.subheadline)
+                    .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+            }
+            
+            VStack(spacing: AviationTheme.Spacing.md) {
+                themeOptionCard(
+                    icon: "circle.lefthalf.filled",
+                    title: "跟隨系統",
+                    subtitle: "隨裝置設定自動切換淺色 / 深色",
+                    value: "system"
+                )
+                
+                themeOptionCard(
+                    icon: "sun.max.fill",
+                    title: "淺色模式",
+                    subtitle: "始終使用明亮的淺色背景",
+                    value: "light"
+                )
+                
+                themeOptionCard(
+                    icon: "moon.fill",
+                    title: "深色模式",
+                    subtitle: "始終使用暗色背景，減少眩光",
+                    value: "dark"
+                )
+            }
+            .padding(.horizontal, AviationTheme.Spacing.md)
+            
+            Text("此設定之後可在「設定 > 外觀」中更改")
+                .font(AviationTheme.Typography.caption)
+                .foregroundColor(AviationTheme.Colors.tertiaryText(colorScheme))
+            
+            Spacer()
+            Spacer()
+        }
+        .padding(.horizontal, AviationTheme.Spacing.md)
+    }
+    
+    private func themeOptionCard(icon: String, title: String, subtitle: String, value: String) -> some View {
+        let isSelected = userColorScheme == value
+        return Button {
+            withAnimation(.spring(duration: 0.25)) {
+                userColorScheme = value
+            }
+        } label: {
+            HStack(spacing: 16) {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(isSelected
+                                    ? AviationTheme.Colors.cathayJade
+                                    : AviationTheme.Colors.secondaryText(colorScheme))
+                    .frame(width: 36)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(AviationTheme.Typography.headline)
+                        .foregroundColor(AviationTheme.Colors.primaryText(colorScheme))
+                    
+                    Text(subtitle)
+                        .font(AviationTheme.Typography.caption)
+                        .foregroundColor(AviationTheme.Colors.secondaryText(colorScheme))
+                }
+                
+                Spacer()
+                
+                Image(systemName: isSelected
+                      ? "checkmark.circle.fill"
+                      : "circle")
+                    .font(.title3)
+                    .foregroundColor(isSelected
+                                    ? AviationTheme.Colors.cathayJade
+                                    : AviationTheme.Colors.tertiaryText(colorScheme))
+            }
+            .padding(AviationTheme.Spacing.md)
+            .background(AviationTheme.Colors.cardBackground(colorScheme))
+            .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
+            .overlay(
+                RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg)
+                    .stroke(isSelected
+                            ? AviationTheme.Colors.cathayJade
+                            : Color.clear,
+                            lineWidth: 2)
+            )
+            .shadow(color: AviationTheme.Shadows.cardShadow(colorScheme).opacity(0.5), radius: 8, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    // MARK: - Page 8: CloudKit同步設定
     private var iCloudPage: some View {
         VStack(spacing: AviationTheme.Spacing.xl) {
             Spacer()
@@ -400,8 +895,8 @@ struct OnboardingView: View {
                 
                 iCloudOptionCard(
                     icon: "internaldrive.fill",
-                    title: "僅儲存在本機",
-                    subtitle: "資料只存在此裝置，不會上傳至 iCloud",
+                    title: "僅存在本機，手動備份",
+                    subtitle: "資料不會自動同步，但您可以隨時手動上傳 iCloud 備份",
                     isSelected: !cloudKitSyncEnabled
                 ) {
                     withAnimation(.spring(duration: 0.25)) {
@@ -495,7 +990,7 @@ struct OnboardingView: View {
                         currentPage += 1
                     }
                 } else {
-                    dismiss()
+                    completeOnboarding()
                 }
             } label: {
                 Text(currentPage < totalPages - 1 ? "下一步" : "開始使用")
@@ -507,6 +1002,31 @@ struct OnboardingView: View {
                     .clipShape(RoundedRectangle(cornerRadius: AviationTheme.CornerRadius.lg))
             }
         }
+    }
+    
+    // MARK: - 完成 Onboarding
+    private func completeOnboarding() {
+        // 寫入現有里程（如果有輸入）
+        if let miles = Int(existingMilesText.replacingOccurrences(of: ",", with: "")),
+           miles > 0 {
+            viewModel.addTransaction(
+                amount: 0,
+                earnedMiles: miles,
+                source: .initialInput,
+                notes: "初次設定時輸入的現有里程"
+            )
+        }
+        
+        // 寫入生日月份
+        if enableBirthday {
+            var components = Calendar.current.dateComponents([.year, .month, .day], from: viewModel.userBirthday)
+            components.month = selectedBirthdayMonth
+            if let newDate = Calendar.current.date(from: components) {
+                viewModel.userBirthday = newDate
+            }
+        }
+        
+        dismiss()
     }
 }
 

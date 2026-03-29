@@ -137,6 +137,7 @@ enum MileageSource: String, Codable, CaseIterable {
     case pointsTransfer = "他點轉入"
     case flight = "飛行累積"
     case ticketRedemption = "機票兌換"
+    case initialInput = "初次輸入"
     
     var icon: String {
         switch self {
@@ -150,6 +151,7 @@ enum MileageSource: String, Codable, CaseIterable {
         case .pointsTransfer: return "arrow.down.circle.fill"
         case .flight: return "airplane"
         case .ticketRedemption: return "ticket.fill"
+        case .initialInput: return "tray.and.arrow.down.fill"
         }
     }
     
@@ -165,6 +167,7 @@ enum MileageSource: String, Codable, CaseIterable {
         case .pointsTransfer: return "indigo"
         case .flight: return "cyan"
         case .ticketRedemption: return "indigo"
+        case .initialInput: return "mint"
         }
     }
 }
